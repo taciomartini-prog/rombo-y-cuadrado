@@ -70,27 +70,52 @@ function placementColor(room){
   return [first,second,first,second][room.placementIndex];
 }
 function canMovePiece(room,p,r,c){
-  if(!p)return false;
+  if(!p)return {ok:false,reason:'Pieza inexistente.'};
+  if(r<0||r>=ROWS||c<0||c>=COLS)return {ok:false,reason:'Destino fuera del tablero.'};
+  if(r===p.r&&c===p.c)return {ok:false,reason:'La pieza ya está en esa casilla.'};
+
   const dr=r-p.r,dc=c-p.c,adr=Math.abs(dr),adc=Math.abs(dc);
-  const one=p.shape==='diamond' ? ((adr===1&&adc===0)||(adr===0&&adc===1)) : (adr===1&&adc===1);
-  if(one && piecesAt(room,r,c).length===0)return true;
-  const target=piecesAt(room,r,c).find(q=>q.color!==p.color);
-  if(!target)return false;
+  const destination=piecesAt(room,r,c);
+  const ownAtDestination=destination.find(q=>q.color===p.color);
+  if(ownAtDestination)return {ok:false,reason:'No podés ocupar una casilla con tu propia pieza.'};
+
+  // Movimiento normal: exactamente un casillero.
+  const one=p.shape==='diamond'
+    ? ((adr===1&&adc===0)||(adr===0&&adc===1))
+    : (adr===1&&adc===1);
+
+  if(one){
+    if(destination.length===0)return {ok:true,capture:null};
+    const enemy=destination.find(q=>q.color!==p.color);
+    return enemy
+      ? {ok:true,capture:enemy}
+      : {ok:false,reason:'Casilla ocupada.'};
+  }
+
+  // Captura a distancia: solo sobre la línea de movimiento de la pieza.
+  const target=destination.find(q=>q.color!==p.color);
+  if(!target)return {ok:false,reason:'Los movimientos de más de un casillero solo sirven para capturar.'};
+
   let sr=0,sc=0;
   if(p.shape==='diamond'){
     if(adr===0&&adc>0) sc=dc>0?1:-1;
     else if(adc===0&&adr>0) sr=dr>0?1:-1;
-    else return false;
+    else return {ok:false,reason:'El rombo solo se mueve horizontal o verticalmente.'};
   } else {
-    if(adr!==adc||adr===0)return false;
-    sr=dr>0?1:-1; sc=dc>0?1:-1;
+    if(adr!==adc||adr===0)return {ok:false,reason:'El cuadrado solo se mueve en diagonal.'};
+    sr=dr>0?1:-1;
+    sc=dc>0?1:-1;
   }
+
   let rr=p.r+sr,cc=p.c+sc;
   while(rr!==r||cc!==c){
-    if(piecesAt(room,rr,cc).length>0)return false;
-    rr+=sr;cc+=sc;
+    if(piecesAt(room,rr,cc).length>0)
+      return {ok:false,reason:'No podés saltar una pieza.'};
+    rr+=sr;
+    cc+=sc;
   }
-  return true;
+
+  return {ok:true,capture:target};
 }
 function hasVictory(room,color){
   const own=room.pieces.filter(p=>p.color===color);
@@ -211,15 +236,41 @@ wss.on('connection',(ws)=>{
       broadcast(room);return;
     }
     if(msg.type==='move'){
-      if(room.phase!=='start'||room.turnColor!==color)return;
-      const p=room.pieces.find(x=>x.id===msg.pieceId&&x.color===color);if(!p)return;
-      const r=Number(msg.r),c=Number(msg.c);if(!Number.isInteger(r)||!Number.isInteger(c))return;
-      if(!canMovePiece(room,p,r,c))return;
-      const target=room.pieces.find(x=>x.r===r&&x.c===c&&x.color!==color);
-      if(target)room.pieces=room.pieces.filter(x=>x.id!==target.id);
-      p.r=r;p.c=c;room.moveCount[color]++;
+      if(room.phase!=='start'){
+        return send(ws,{type:'error',message:'La partida todavía no está en fase de movimiento.'});
+      }
+      if(room.turnColor!==color){
+        return send(ws,{type:'error',message:'Todavía no es tu turno.'});
+      }
+
+      const p=room.pieces.find(x=>x.id===msg.pieceId&&x.color===color);
+      if(!p){
+        return send(ws,{type:'error',message:'No se encontró esa pieza.'});
+      }
+
+      const r=Number(msg.r),c=Number(msg.c);
+      if(!Number.isInteger(r)||!Number.isInteger(c)){
+        return send(ws,{type:'error',message:'Destino inválido.'});
+      }
+
+      const result=canMovePiece(room,p,r,c);
+      if(!result.ok){
+        return send(ws,{type:'error',message:result.reason||'Movimiento no válido.'});
+      }
+
+      if(result.capture){
+        room.pieces=room.pieces.filter(x=>x.id!==result.capture.id);
+      }
+
+      p.r=r;
+      p.c=c;
+      room.moveCount[color]++;
+
       if(finishResult(room))return;
-      room.turnColor=color==='blue'?'red':'blue';broadcast(room);return;
+
+      room.turnColor=color==='blue'?'red':'blue';
+      broadcast(room);
+      return;
     }
     if(msg.type==='reset')return resetRoom(room,ws);
   });
