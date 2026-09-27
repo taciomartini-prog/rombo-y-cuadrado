@@ -259,10 +259,23 @@ function finalizePlacement(){
 }
 function place(r,c){
   if(!state || state.phase!=='placement' || state.placementIndex===undefined)return;
-  const item=getPlacementOrder()[state.placementIndex]; if(!item || item.color!==myColor)return;
-  if(pendingPlacement&&pendingPlacement.r===r&&pendingPlacement.c===c){rotatePlacement();return;}
+  const order=getPlacementOrder();
+  const item=order[state.placementIndex];
+  if(!item || item.color!==myColor)return;
+
+  if(pendingPlacement&&pendingPlacement.r===r&&pendingPlacement.c===c){
+    rotatePlacement();
+    return;
+  }
   if(pendingPlacement)return;
-  if(!validPlacement(r,c)){renderAll();return;}
+
+  if(!validPlacement(r,c)){
+    renderAll();
+    return;
+  }
+
+  // La cuarta pieza sigue siendo una colocación: nunca se pasa
+  // a movimiento hasta que el servidor confirme las 4 piezas.
   startPlacementPreview(r,c);
 }
 function canMovePiece(p,r,c){
@@ -289,7 +302,12 @@ function renderTurnIndicator(){
   if(state.phase==='placement'){who=getPlacementOrder()[state.placementIndex]?.color||state.starter}
   else if(state.phase==='start')who=state.turnColor;
   else if(state.phase==='finished'&&state.matchWinner){turnIndicator.textContent=state.matchWinner==='blue'?'GANA AZUL':'GANA ROJO';turnIndicator.className='turn-indicator '+state.matchWinner+' match-over';return}
-  turnIndicator.textContent=who?'MUEVE '+(who==='blue'?'AZUL':'ROJO'):'';turnIndicator.className='turn-indicator '+(who||'');
+  if(state.phase==='placement'){
+    turnIndicator.textContent=who?'COLOCA '+(who==='blue'?'AZUL':'ROJO'):'';
+  }else{
+    turnIndicator.textContent=who?'MUEVE '+(who==='blue'?'AZUL':'ROJO'):'';
+  }
+  turnIndicator.className='turn-indicator '+(who||'');
 }
 function renderAll(){
   if(!state)return;
