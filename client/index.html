@@ -13,9 +13,10 @@
 html,body{margin:0;width:100%;height:100%;min-height:100dvh;overflow:hidden;background:#fff;color:#222;font-family:Arial,sans-serif;touch-action:none;position:fixed;inset:0}
 body{display:flex;justify-content:center;align-items:center}
 .app{width:100%;height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:calc(4px + env(safe-area-inset-top)) 6px calc(4px + env(safe-area-inset-bottom));text-align:center;overflow:hidden}
-.score{font-size:21px;font-weight:800;line-height:1.15;margin:0 0 5px;flex:none;width:100%;display:flex;justify-content:center}
-.score-dots{display:flex;justify-content:center;align-items:center;gap:26px;margin-top:4px}
-.score-dot-group{display:flex;gap:6px;align-items:center}.score-dot{width:14px;height:14px;border-radius:50%;border:1.5px solid #777;background:#fff;display:inline-block}
+.score{font-size:21px;font-weight:800;line-height:1.15;margin:0 0 5px;flex:none;width:100%;display:flex;justify-content:center;height:20px}
+.score-dots{display:flex;justify-content:center;align-items:center;gap:22px;width:210px;height:18px;margin:0 auto}
+.score-dot-group{display:grid;grid-template-columns:repeat(5,14px);gap:5px;width:90px;height:14px;flex:none}
+.score-dot{width:14px;height:14px;border-radius:50%;border:1.5px solid #777;background:#fff;display:block;flex:none}
 .score-dot.blue{border-color:#1769e0}.score-dot.red{border-color:#ed3030}
 .score-dot.blue.on{background:#1769e0;border-color:#1769e0}
 .score-dot.red.on{background:#ed3030;border-color:#ed3030}
