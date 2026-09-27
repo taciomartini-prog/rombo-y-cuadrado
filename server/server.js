@@ -1,346 +1,284 @@
-<!doctype html>
-<html lang="es">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Rombo y Cuadrado">
-<meta name="theme-color" content="#ffffff">
-<title>Rombo y Cuadrado</title>
-<style>
-*{box-sizing:border-box}
-html,body{margin:0;width:100%;height:100%;min-height:100dvh;overflow:hidden;background:#fff;color:#222;font-family:Arial,sans-serif;touch-action:none;position:fixed;inset:0}
-body{display:flex;justify-content:center;align-items:center}
-.app{width:100%;height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:calc(4px + env(safe-area-inset-top)) 6px calc(4px + env(safe-area-inset-bottom));text-align:center;overflow:hidden}
-.score{font-size:21px;font-weight:800;line-height:1.15;margin:0 0 5px;flex:none}
-.score-dots{display:flex;justify-content:center;gap:7px;margin-top:4px}
-.score-dot{width:12px;height:12px;border-radius:50%;border:1.5px solid #777;background:#fff;display:inline-block}
-.score-dot.blue.on{background:#1769e0;border-color:#1769e0}
-.score-dot.red.on{background:#ed3030;border-color:#ed3030}
-.score .blue-score{color:#1769e0}.score .red-score{color:#ed3030}
-h1{display:none}
-.status{min-height:28px;font-size:17px;line-height:1.25;margin:0 0 6px;flex:none}
-.board{height:min(82dvh,860px);max-height:calc(100dvh - 115px);width:auto;max-width:98vw;aspect-ratio:5/9;margin:0;flex:none;display:grid;grid-template-columns:repeat(5,1fr);grid-template-rows:repeat(9,1fr);border:1px solid #111;background:#fff;touch-action:none}
-.cell{position:relative;border-right:1px solid #222;border-bottom:1px solid #222;background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;user-select:none;-webkit-user-select:none}
-.cell:nth-child(5n){border-right:0}.cell:nth-last-child(-n+5){border-bottom:0}
-.cell.forbidden{background:rgba(128,128,128,.28);cursor:not-allowed}
-.piece{width:58%;aspect-ratio:1;border:2px solid #111;position:absolute;z-index:2;pointer-events:none}
-.piece.blue{background:#1769e0}.piece.red{background:#ed3030}
-.piece.diamond{transform:rotate(45deg);border-radius:2px}
-.placement-ghost{opacity:.72;z-index:5}
-.piece.selected-piece{outline:3px solid #111;outline-offset:2px}
-.winner-dot{width:18px;height:18px;border-radius:50%;background:#000;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);animation:winnerBlink .35s ease-in-out 8;pointer-events:none}
-@keyframes winnerBlink{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.08;transform:scale(.72)}}
-.violet{z-index:6;width:34%;height:34%;background:#8b2bbd;border:1px solid #111;transform:rotate(45deg)}
+const http = require('http');
+const crypto = require('crypto');
+const { WebSocketServer } = require('ws');
 
+const PORT = process.env.PORT || 10000;
+const rooms = new Map();
+const COLS = 5, ROWS = 9;
 
-
-.status,.turn,.hint{display:none}
-.controls{display:flex;align-items:center;justify-content:center;gap:18px;width:100%;margin-top:8px;min-height:50px}
-.reset{margin:0;padding:9px 18px;border:1px solid #555;background:#f2f2f2;border-radius:9px;font-weight:700;font-size:16px;color:#1769e0}
-.turn-indicator{display:flex;align-items:center;justify-content:center;margin:0;min-height:44px;font-size:22px;font-weight:800;letter-spacing:.3px}
-.turn-indicator.blue{color:#1769e0}
-.turn-indicator.red{color:#e32626}
-.match-over{font-size:24px;font-weight:900}
-
-
-.lobby{width:min(92vw,430px);display:flex;flex-direction:column;align-items:center;gap:14px}
-.lobby h2{margin:0;font-size:28px}
-.lobby p{margin:0;font-size:17px;line-height:1.3}
-.lobby button,.lobby input{font:inherit;font-size:18px;border-radius:10px;padding:12px 16px;border:1px solid #777;background:#f4f4f4}
-.lobby button{font-weight:800;cursor:pointer}
-.lobby input{width:100%;text-align:center;background:#fff}
-.share-box{width:100%;display:flex;flex-direction:column;gap:8px}
-.share-link{font-size:14px!important}
-.connection{font-size:19px;font-weight:800;min-height:28px}
-.error{color:#c00;font-weight:700;min-height:24px}
-.hidden{display:none!important}
-</style>
-</head>
-<body>
-<div id="lobby" class="lobby">
-  <h2>ROMBO Y CUADRADO</h2>
-  <button id="createBtn">CREAR PARTIDA</button>
-  <div id="joinArea" class="hidden" style="width:100%;display:flex;flex-direction:column;gap:8px">
-    <input id="gameCode" placeholder="Código de partida" maxlength="16" autocomplete="off">
-    <button id="joinBtn">UNIRSE</button>
-  </div>
-  <div id="lobbyMsg" class="connection"></div>
-  <div id="shareBox" class="share-box hidden">
-    <p>Compartí este link con el segundo jugador:</p>
-    <input id="shareLink" class="share-link" readonly>
-    <button id="copyBtn">COPIAR LINK</button>
-    <div id="connectionStatus" class="connection">Esperando al jugador 2...</div>
-  </div>
-  <div id="error" class="error"></div>
-</div>
-
-<div id="game" class="app hidden">
-  <h1>Rombo y Cuadrado</h1>
-  <div id="score" class="score"></div>
-  <div id="status" class="status"></div>
-  <div id="board" class="board"></div>
-  <div id="turn" class="turn"></div>
-  <div id="hint" class="hint"></div>
-  <div class="controls"><div id="turnIndicator" class="turn-indicator"></div><button id="reset" class="reset">Reiniciar</button></div>
-</div>
-<script>const COLS=5, ROWS=9;
-const lobby=document.getElementById('lobby');
-const game=document.getElementById('game');
-const createBtn=document.getElementById('createBtn');
-const joinBtn=document.getElementById('joinBtn');
-const gameCodeInput=document.getElementById('gameCode');
-const lobbyMsg=document.getElementById('lobbyMsg');
-const shareBox=document.getElementById('shareBox');
-const shareLink=document.getElementById('shareLink');
-const copyBtn=document.getElementById('copyBtn');
-const connectionStatus=document.getElementById('connectionStatus');
-const errorEl=document.getElementById('error');
-const board=document.getElementById('board');
-const scoreEl=document.getElementById('score');
-const statusEl=document.getElementById('status');
-const turnEl=document.getElementById('turn');
-const hintEl=document.getElementById('hint');
-const turnIndicator=document.getElementById('turnIndicator');
-const resetBtn=document.getElementById('reset');
-
-// Después de desplegar el servidor en Render, reemplazar esta URL.
-const SERVER_URL = window.GAME_SERVER_URL || 'wss://rombo-y-cuadrado.onrender.com';
-const tokenKey='romboCuadradoPlayerToken';
-let playerToken=localStorage.getItem(tokenKey);
-if(!playerToken){ playerToken=crypto.randomUUID(); localStorage.setItem(tokenKey,playerToken); }
-
-let ws=null, roomId=null, myColor=null, state=null;
-let pendingPlacement=null, placementTimer=null;
-let selectedPieceId=null;
-let shareBase=location.origin;
-
-function getRoomFromPath(){
-  const m=location.pathname.match(/^\/partida\/([A-Za-z0-9-]+)\/?$/);
-  if(m) return m[1];
-  const q=new URLSearchParams(location.search).get('partida');
-  return q || null;
+function makeId() {
+  return crypto.randomBytes(5).toString('base64url').toUpperCase().replace(/[-_]/g,'').slice(0,8);
 }
-function makeRoomUrl(id){ return `${shareBase}/partida/${id}`; }
-function setError(msg){ errorEl.textContent=msg||''; }
-function showGame(){ lobby.classList.add('hidden'); game.classList.remove('hidden'); }
-function showLobby(){ lobby.classList.remove('hidden'); game.classList.add('hidden'); }
-function send(msg){ if(ws && ws.readyState===WebSocket.OPEN) ws.send(JSON.stringify({...msg,token:playerToken,roomId})); }
-function connect(id, autoJoin=false){
-  roomId=id;
-  setError('');
-  if(ws) try{ws.close()}catch{}
-  connectionStatus.textContent='Conectando...';
-  ws=new WebSocket(SERVER_URL);
-  ws.onopen=()=>{
-    if(autoJoin) send({type:'join'});
-    else send({type:'create'});
+function newRoom() {
+  let id;
+  do id = makeId(); while (rooms.has(id));
+  return {
+    id,
+    starter: 'blue',
+    nextStarter: 'red',
+    phase: 'placement',
+    placementIndex: 0,
+    pieces: [],
+    turnColor: 'blue',
+    moveCount: {blue:0, red:0},
+    scores: {blue:0, red:0},
+    winnerColor: null,
+    matchWinner: null,
+    players: {blue:null, red:null},
+    connections: new Set(),
+    restartTimer: null
   };
-  ws.onmessage=e=>{
-    let msg; try{msg=JSON.parse(e.data)}catch{return;}
-    if(msg.type==='created'){
-      roomId=msg.roomId;
-      history.replaceState({},'',`/partida/${roomId}`);
-      shareLink.value=makeRoomUrl(roomId);
-      shareBox.classList.remove('hidden');
-      lobbyMsg.textContent='Partida creada';
-      connectionStatus.textContent='Esperando al jugador 2...';
-      send({type:'join'});
-      return;
-    }
-    if(msg.type==='joined'){
-      // El creador/jugador queda en la sala de espera.
-      // El tablero solo se muestra cuando el servidor informa que ambos jugadores están conectados.
-      myColor=msg.color;
-      connectionStatus.textContent = state && state.player2Connected ? '🟢 JUGADOR 2 CONECTADO' : 'Esperando al jugador 2...';
-      return;
-    }
-    if(msg.type==='state'){
-      state=msg.state;
-      myColor=msg.yourColor || myColor;
-      if(roomId){
-        shareLink.value=makeRoomUrl(roomId);
-      }
-      if(state.player2Connected){
-        connectionStatus.textContent='🟢 JUGADOR 2 CONECTADO';
-      }else{
-        connectionStatus.textContent='Esperando al jugador 2...';
-      }
-      if(state.player1Connected && state.player2Connected) showGame();
-      renderAll();
-      return;
-    }
-    if(msg.type==='error'){
-      setError(msg.message||'No se pudo conectar.');
-      if(msg.fatal){ try{ws.close()}catch{} }
-      return;
-    }
-    if(msg.type==='reconnected'){
-      myColor=msg.color; showGame(); return;
-    }
+}
+function send(ws, msg){ if(ws && ws.readyState===1) ws.send(JSON.stringify(msg)); }
+function publicState(room) {
+  return {
+    id: room.id,
+    phase: room.phase,
+    starter: room.starter,
+    placementIndex: room.placementIndex,
+    pieces: room.pieces,
+    turnColor: room.turnColor,
+    moveCount: room.moveCount,
+    scores: room.scores,
+    winnerColor: room.winnerColor,
+    matchWinner: room.matchWinner,
+    player1Connected: !!room.players.blue?.ws,
+    player2Connected: !!room.players.red?.ws
   };
-  ws.onclose=()=>{
-    if(state && state.player1Connected && state.player2Connected){
-      connectionStatus.textContent='🔴 CONEXIÓN PERDIDA — la partida sigue guardada';
-    }
-  };
-  ws.onerror=()=>setError('No se pudo conectar con el servidor.');
 }
-
-createBtn.onclick=()=>connect(null,false);
-joinBtn.onclick=()=>{
-  const id=gameCodeInput.value.trim();
-  if(!id){setError('Ingresá el código de partida.');return;}
-  history.replaceState({},'',`/partida/${id}`);
-  shareLink.value=makeRoomUrl(id);
-  connect(id,true);
-};
-copyBtn.onclick=async()=>{
-  try{await navigator.clipboard.writeText(shareLink.value);copyBtn.textContent='LINK COPIADO';setTimeout(()=>copyBtn.textContent='COPIAR LINK',1200)}catch{shareLink.select();document.execCommand('copy');copyBtn.textContent='LINK COPIADO';}
-};
-gameCodeInput.addEventListener('keydown',e=>{if(e.key==='Enter')joinBtn.click()});
-
-const roomFromUrl=getRoomFromPath();
-if(roomFromUrl){
-  roomId=roomFromUrl;
-  shareLink.value=makeRoomUrl(roomId);
-  lobbyMsg.textContent='Te invitaron a una partida';
-  joinBtn.classList.remove('hidden');
-  document.getElementById('joinArea').classList.remove('hidden');
-  joinBtn.textContent='UNIRSE A LA PARTIDA';
-  createBtn.classList.add('hidden');
-} else {
-  // Solo se ofrece crear una partida; no hay lobby general.
-  document.getElementById('joinArea').classList.add('hidden');
+function broadcast(room){
+  const st = publicState(room);
+  for(const ws of room.connections) send(ws,{type:'state',state:st,yourColor:ws.playerColor||null});
 }
-
-function renderScore(){
-  const blueDots=Array.from({length:5},(_,i)=>`<span class="score-dot blue ${i<(state?.scores?.blue||0)?'on':''}></span>`).join('');
-  const redDots=Array.from({length:5},(_,i)=>`<span class="score-dot red ${i<(state?.scores?.red||0)?'on':''}></span>`).join('');
-  scoreEl.innerHTML=`<div class="score-dots"><span>${blueDots}</span><span style="display:inline-block;width:28px"></span><span>${redDots}</span></div>`;
-}
-function allPieces(){return [...(state?.pieces||[])];}
-function piecesAt(r,c){return allPieces().filter(p=>p.r===r&&p.c===c)}
-function getPlacementOrder(){
-  const first=state?.starter||'blue'; const second=first==='blue'?'red':'blue';
-  return [{color:first},{color:second},{color:first},{color:second}];
-}
-function validPlacement(r,c){
-  const item=getPlacementOrder()[state?.placementIndex||0]; if(!item)return false;
-  for(const p of allPieces()){const dr=Math.abs(p.r-r),dc=Math.abs(p.c-c);if(dr<=1&&dc<=1)return false;}
-  const same=allPieces().find(p=>p.color===item.color);
-  if(same){const dr=Math.abs(same.r-r),dc=Math.abs(same.c-c);const whiteDistance=Math.max(dr-1,0)+Math.max(dc-1,0);if(whiteDistance<3)return false;}
+function piecesAt(room,r,c){ return room.pieces.filter(p=>p.r===r&&p.c===c); }
+function validPlacement(room,r,c,color){
+  if(!Number.isInteger(r)||!Number.isInteger(c)||r<0||r>=ROWS||c<0||c>=COLS)return false;
+  for(const p of room.pieces){
+    const dr=Math.abs(p.r-r), dc=Math.abs(p.c-c);
+    if(dr<=1&&dc<=1)return false;
+  }
+  const same=room.pieces.find(p=>p.color===color);
+  if(same){
+    const dr=Math.abs(same.r-r), dc=Math.abs(same.c-c);
+    const whiteDistance=Math.max(dr-1,0)+Math.max(dc-1,0);
+    if(whiteDistance<3)return false;
+  }
   return true;
 }
-function clearPlacement(){if(placementTimer){clearTimeout(placementTimer);placementTimer=null}pendingPlacement=null}
-function startPlacementPreview(r,c){
-  clearPlacement();
-  const item=getPlacementOrder()[state.placementIndex];
-  const existing=allPieces().find(p=>p.color===item.color);
-  const forcedShape=existing?(existing.shape==='diamond'?'square':'diamond'):'diamond';
-  pendingPlacement={r,c,color:item.color,shape:forcedShape,rotation:forcedShape==='diamond'?45:0,canRotate:!existing};
-  placementTimer=setTimeout(()=>{if(pendingPlacement) finalizePlacement()},700);
-  renderAll();
+function placementColor(room){
+  const first=room.starter, second=first==='blue'?'red':'blue';
+  return [first,second,first,second][room.placementIndex];
 }
-function rotatePlacement(){
-  if(!pendingPlacement?.canRotate)return;
-  pendingPlacement.rotation=(pendingPlacement.rotation+45)%360;
-  pendingPlacement.shape=(pendingPlacement.rotation%90===45)?'diamond':'square';
-  clearTimeout(placementTimer); placementTimer=setTimeout(()=>{if(pendingPlacement)finalizePlacement()},700);
-  renderAll();
-}
-function finalizePlacement(){
-  if(!pendingPlacement || state.phase!=='placement')return;
-  const p={r:pendingPlacement.r,c:pendingPlacement.c,shape:pendingPlacement.shape,rotation:pendingPlacement.rotation};
-  if(!validPlacement(p.r,p.c)){clearPlacement();renderAll();return}
-  send({type:'place',r:p.r,c:p.c,shape:p.shape,rotation:p.rotation});
-  clearPlacement();
-}
-function place(r,c){
-  if(!state || state.phase!=='placement' || state.placementIndex===undefined)return;
-  const order=getPlacementOrder();
-  const item=order[state.placementIndex];
-  if(!item || item.color!==myColor)return;
+function canMovePiece(room,p,r,c){
+  if(!p)return {ok:false,reason:'Pieza inexistente.'};
+  if(r<0||r>=ROWS||c<0||c>=COLS)return {ok:false,reason:'Destino fuera del tablero.'};
+  if(r===p.r&&c===p.c)return {ok:false,reason:'La pieza ya está en esa casilla.'};
 
-  if(pendingPlacement&&pendingPlacement.r===r&&pendingPlacement.c===c){
-    rotatePlacement();
-    return;
-  }
-  if(pendingPlacement)return;
+  const dr=r-p.r,dc=c-p.c,adr=Math.abs(dr),adc=Math.abs(dc);
+  const destination=piecesAt(room,r,c);
+  const ownAtDestination=destination.find(q=>q.color===p.color);
+  if(ownAtDestination)return {ok:false,reason:'No podés ocupar una casilla con tu propia pieza.'};
 
-  if(!validPlacement(r,c)){
-    renderAll();
-    return;
+  // Movimiento normal: exactamente un casillero.
+  const one=p.shape==='diamond'
+    ? ((adr===1&&adc===0)||(adr===0&&adc===1))
+    : (adr===1&&adc===1);
+
+  if(one){
+    if(destination.length===0)return {ok:true,capture:null};
+    const enemy=destination.find(q=>q.color!==p.color);
+    return enemy
+      ? {ok:true,capture:enemy}
+      : {ok:false,reason:'Casilla ocupada.'};
   }
 
-  // La cuarta pieza sigue siendo una colocación: nunca se pasa
-  // a movimiento hasta que el servidor confirme las 4 piezas.
-  startPlacementPreview(r,c);
-}
-function canMovePiece(p,r,c){
-  if(!p)return false; const dr=r-p.r,dc=c-p.c,adr=Math.abs(dr),adc=Math.abs(dc);
-  const one=p.shape==='diamond'?((adr===1&&adc===0)||(adr===0&&adc===1)):(adr===1&&adc===1);
-  if(one)return true;
-  const target=piecesAt(r,c).find(q=>q.color!==p.color); if(!target)return false;
+  // Captura a distancia: solo sobre la línea de movimiento de la pieza.
+  const target=destination.find(q=>q.color!==p.color);
+  if(!target)return {ok:false,reason:'Los movimientos de más de un casillero solo sirven para capturar.'};
+
   let sr=0,sc=0;
-  if(p.shape==='diamond'){if(adr===0&&adc>0)sc=dc>0?1:-1;else if(adc===0&&adr>0)sr=dr>0?1:-1;else return false;}
-  else {if(adr!==adc||adr===0)return false;sr=dr>0?1:-1;sc=dc>0?1:-1;}
-  let rr=p.r+sr,cc=p.c+sc;while(rr!==r||cc!==c){if(piecesAt(rr,cc).length>0)return false;rr+=sr;cc+=sc;}return true;
-}
-function gameClick(r,c){
-  if(!state||state.phase!=='start'||state.turnColor!==myColor)return;
-  const targets=piecesAt(r,c), own=targets.filter(p=>p.color===myColor), enemy=targets.find(p=>p.color!==myColor);
-  if(!selectedPieceId){if(own.length){selectedPieceId=own[0].id;renderAll()}return;}
-  if(own.length){const mine=allPieces().filter(p=>p.color===myColor);const idx=mine.findIndex(p=>p.id===selectedPieceId);selectedPieceId=idx>=0?mine[(idx+1)%mine.length].id:own[0].id;renderAll();return;}
-  const selected=allPieces().find(p=>p.id===selectedPieceId); if(!selected||!canMovePiece(selected,r,c))return;
-  send({type:'move',pieceId:selected.id,r,c}); selectedPieceId=null;
-}
-function renderTurnIndicator(){
-  if(!state){turnIndicator.textContent='';return}
-  let who=null;
-  if(state.phase==='placement'){who=getPlacementOrder()[state.placementIndex]?.color||state.starter}
-  else if(state.phase==='start')who=state.turnColor;
-  else if(state.phase==='finished'&&state.matchWinner){turnIndicator.textContent=state.matchWinner==='blue'?'GANA AZUL':'GANA ROJO';turnIndicator.className='turn-indicator '+state.matchWinner+' match-over';return}
-  if(state.phase==='placement'){
-    turnIndicator.textContent=who?'COLOCA '+(who==='blue'?'AZUL':'ROJO'):'';
-  }else{
-    turnIndicator.textContent=who?'MUEVE '+(who==='blue'?'AZUL':'ROJO'):'';
+  if(p.shape==='diamond'){
+    if(adr===0&&adc>0) sc=dc>0?1:-1;
+    else if(adc===0&&adr>0) sr=dr>0?1:-1;
+    else return {ok:false,reason:'El rombo solo se mueve horizontal o verticalmente.'};
+  } else {
+    if(adr!==adc||adr===0)return {ok:false,reason:'El cuadrado solo se mueve en diagonal.'};
+    sr=dr>0?1:-1;
+    sc=dc>0?1:-1;
   }
-  turnIndicator.className='turn-indicator '+(who||'');
-}
-function renderAll(){
-  if(!state)return;
-  renderScore(); renderTurnIndicator();
-  const connected=state.player1Connected&&state.player2Connected;
-  if(!connected){
-    const other=state.player1Connected?'JUGADOR 2':'JUGADOR 1';
-    statusEl.textContent=`🔴 ${other} DESCONECTADO — la partida sigue guardada`;
-  }else if(state.phase==='finished'){
-    statusEl.textContent=state.matchWinner?`¡GANA EL PARTIDO ${state.matchWinner==='blue'?'AZUL':'ROJO'}!`:(state.winnerColor?`¡Gana el jugador ${state.winnerColor==='blue'?'AZUL':'ROJO'}!`:'¡EMPATE!');
-  }else{
-    statusEl.textContent='';
-  }
-  if(state.phase==='start')turnEl.textContent=state.turnColor===myColor?'Es tu turno':'Turno del otro jugador'; else turnEl.textContent='';
-  hintEl.textContent=!connected?'La partida no se corta. Cuando el jugador vuelva, continúa desde acá.':(state.phase==='placement'?'Cada jugador coloca sus dos piezas.':'');
-  board.innerHTML='';
-  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
-    const cell=document.createElement('div');cell.className='cell';
-    if(state.phase==='placement'&&!validPlacement(r,c))cell.classList.add('forbidden');
-    if(state.phase==='placement')cell.onclick=()=>place(r,c); else if(state.phase==='start')cell.onclick=()=>gameClick(r,c);
-    board.appendChild(cell);
-  }
-  const cells=[...board.children];
-  const groups={}; allPieces().forEach(p=>{const k=`${p.r}-${p.c}`;(groups[k]??=[]).push(p)});
-  for(const group of Object.values(groups)){
-    const cell=cells[group[0].r*COLS+group[0].c];if(!cell)continue;
-    group.forEach((p,i)=>{const el=document.createElement('div');el.className=`piece ${p.color} ${p.shape}`;if(selectedPieceId===p.id)el.classList.add('selected-piece');if(group.length>1)el.style.transform=i===0?'translateX(-14%) rotate(45deg)':'translateX(14%)';cell.appendChild(el);if(state.phase==='finished'&&state.winnerColor===p.color){const dot=document.createElement('div');dot.className='winner-dot';cell.appendChild(dot)}});
-    if(group.length>1){const v=document.createElement('div');v.className='piece violet';cell.appendChild(v)}
-  }
-  if(pendingPlacement&&state.phase==='placement'){const cell=cells[pendingPlacement.r*COLS+pendingPlacement.c];if(cell){const ghost=document.createElement('div');ghost.className=`piece ${pendingPlacement.color} ${pendingPlacement.shape} placement-ghost`;ghost.style.transform=`rotate(${pendingPlacement.rotation}deg)`;cell.appendChild(ghost)}}
-}
-resetBtn.onclick=()=>send({type:'reset'});
 
-// Si el usuario abre un link de invitación, se conecta automáticamente.
-if(roomFromUrl){connect(roomFromUrl,true)}
-</script></body>
+  let rr=p.r+sr,cc=p.c+sc;
+  while(rr!==r||cc!==c){
+    if(piecesAt(room,rr,cc).length>0)
+      return {ok:false,reason:'No podés saltar una pieza.'};
+    rr+=sr;
+    cc+=sc;
+  }
+
+  return {ok:true,capture:target};
+}
+function hasVictory(room,color){
+  const own=room.pieces.filter(p=>p.color===color);
+  const enemy=room.pieces.filter(p=>p.color!==color);
+  if(enemy.length<2)return true;
+  if(own.length===2){
+    const dr=Math.abs(own[0].r-own[1].r),dc=Math.abs(own[0].c-own[1].c);
+    if(dr<=1&&dc<=1&&(dr+dc)>0)return true;
+  }
+  return false;
+}
+function finishResult(room){
+  const blueWin=hasVictory(room,'blue'), redWin=hasVictory(room,'red');
+  if(!blueWin&&!redWin)return false;
+  if(room.moveCount.blue!==room.moveCount.red)return false;
+  room.phase='finished';
+  room.winnerColor=(blueWin&&!redWin)?'blue':(redWin&&!blueWin)?'red':null;
+  if(room.winnerColor){
+    room.scores[room.winnerColor]++;
+    if(room.scores[room.winnerColor]>=5) room.matchWinner=room.winnerColor;
+  }
+  broadcast(room);
+  if(!room.matchWinner){
+    room.restartTimer=setTimeout(()=>startNextGame(room),3000);
+  }
+  return true;
+}
+function startNextGame(room){
+  room.restartTimer=null;
+  room.pieces=[];
+  room.placementIndex=0;
+  room.moveCount={blue:0,red:0};
+  room.winnerColor=null;
+  room.matchWinner=null;
+  room.phase='placement';
+  room.starter=room.nextStarter;
+  room.nextStarter=room.nextStarter==='blue'?'red':'blue';
+  room.turnColor=room.starter;
+  broadcast(room);
+}
+function resetRoom(room, ws){
+  if(room.phase==='start'){
+    const loser=room.turnColor, winner=loser==='blue'?'red':'blue';
+    room.scores[winner]++;
+    if(room.scores[winner]>=5){
+      room.matchWinner=winner;
+      room.phase='finished';
+      room.winnerColor=winner;
+      broadcast(room);
+      return;
+    }
+    room.nextStarter=room.starter==='blue'?'red':'blue';
+    room.starter=room.nextStarter;
+  } else if(room.phase==='finished'&&room.matchWinner){
+    room.scores={blue:0,red:0};
+    room.starter=room.starter==='blue'?'red':'blue';
+    room.nextStarter=room.starter==='blue'?'red':'blue';
+  }
+  if(room.restartTimer){clearTimeout(room.restartTimer);room.restartTimer=null;}
+  room.pieces=[];room.placementIndex=0;room.moveCount={blue:0,red:0};room.winnerColor=null;room.matchWinner=null;room.phase='placement';room.turnColor=room.starter;
+  broadcast(room);
+}
+function assignPlayer(room,ws,token){
+  for(const color of ['blue','red']){
+    const p=room.players[color];
+    if(p && p.token===token){
+      p.ws=ws; ws.playerColor=color; ws.roomId=room.id; return color;
+    }
+  }
+  for(const color of ['blue','red']){
+    if(!room.players[color]){
+      room.players[color]={token,ws}; ws.playerColor=color; ws.roomId=room.id; return color;
+    }
+  }
+  return null;
+}
+function createRoomAndJoin(ws,token){
+  const room=newRoom();rooms.set(room.id,room);const color=assignPlayer(room,ws,token);room.connections.add(ws);
+  send(ws,{type:'created',roomId:room.id,color});send(ws,{type:'joined',color});broadcast(room);
+}
+function joinRoom(ws,roomId,token){
+  const room=rooms.get(roomId);
+  if(!room)return send(ws,{type:'error',message:'La partida no existe o el link no es válido.',fatal:true});
+  const existing=['blue','red'].find(c=>room.players[c]?.token===token);
+  if(!existing && room.players.blue?.ws && room.players.red?.ws)return send(ws,{type:'error',message:'Esta partida ya tiene dos jugadores conectados.'});
+  const color=assignPlayer(room,ws,token);
+  if(!color)return send(ws,{type:'error',message:'No hay lugar para otro jugador en esta partida.'});
+  room.connections.add(ws);send(ws,{type:'joined',color});broadcast(room);
+}
+
+const server=http.createServer((req,res)=>{
+  if(req.url==='/health'){res.writeHead(200,{'content-type':'application/json'});res.end(JSON.stringify({ok:true,rooms:rooms.size}));return;}
+  res.writeHead(404);res.end('Not found');
+});
+const wss=new WebSocketServer({server});
+wss.on('connection',(ws)=>{
+  ws.on('message',(raw)=>{
+    let msg;try{msg=JSON.parse(raw.toString())}catch{return}
+    const token=msg.token;
+    if(msg.type==='create'){return createRoomAndJoin(ws,token)}
+    if(msg.type==='join'){
+      if(!msg.roomId)return send(ws,{type:'error',message:'Falta el identificador de partida.'});
+      return joinRoom(ws,msg.roomId,token);
+    }
+    const room=rooms.get(ws.roomId);
+    if(!room || !ws.playerColor)return;
+    const color=ws.playerColor;
+    if(msg.type==='place'){
+      if(room.phase!=='placement'||placementColor(room)!==color)return;
+      if(!validPlacement(room,msg.r,msg.c,color))return;
+      const existing=room.pieces.find(p=>p.color===color);
+      let shape=msg.shape==='square'?'square':'diamond';
+      if(existing)shape=existing.shape==='diamond'?'square':'diamond';
+      const id=crypto.randomUUID();
+      room.pieces.push({id,color,shape,r:msg.r,c:msg.c});
+      room.placementIndex++;
+      if(room.placementIndex>=4){room.phase='start';room.turnColor=room.starter;}
+      broadcast(room);return;
+    }
+    if(msg.type==='move'){
+      if(room.phase!=='start'){
+        return send(ws,{type:'error',message:'La partida todavía no está en fase de movimiento.'});
+      }
+      if(room.turnColor!==color){
+        return send(ws,{type:'error',message:'Todavía no es tu turno.'});
+      }
+
+      const p=room.pieces.find(x=>x.id===msg.pieceId&&x.color===color);
+      if(!p){
+        return send(ws,{type:'error',message:'No se encontró esa pieza.'});
+      }
+
+      const r=Number(msg.r),c=Number(msg.c);
+      if(!Number.isInteger(r)||!Number.isInteger(c)){
+        return send(ws,{type:'error',message:'Destino inválido.'});
+      }
+
+      const result=canMovePiece(room,p,r,c);
+      if(!result.ok){
+        return send(ws,{type:'error',message:result.reason||'Movimiento no válido.'});
+      }
+
+      if(result.capture){
+        room.pieces=room.pieces.filter(x=>x.id!==result.capture.id);
+      }
+
+      p.r=r;
+      p.c=c;
+      room.moveCount[color]++;
+
+      if(finishResult(room))return;
+
+      room.turnColor=color==='blue'?'red':'blue';
+      broadcast(room);
+      return;
+    }
+    if(msg.type==='reset')return resetRoom(room,ws);
+  });
+  ws.on('close',()=>{
+    const room=rooms.get(ws.roomId);if(!room)return;
+    if(room.players[ws.playerColor]?.ws===ws)room.players[ws.playerColor].ws=null;
+    room.connections.delete(ws);
+    broadcast(room);
+  });
+});
+server.listen(PORT,()=>console.log(`Rombo y Cuadrado server listening on ${PORT}`));
