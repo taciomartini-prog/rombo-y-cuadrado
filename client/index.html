@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Rombo y Cuadrado">
+<meta name="theme-color" content="#ffffff">
+<title>Rombo y Cuadrado</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;min-height:100dvh;overflow:hidden;background:#fff;color:#222;font-family:Arial,sans-serif;touch-action:none;position:fixed;inset:0}
+body{display:flex;justify-content:center;align-items:center}
+.app{width:100%;height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:calc(4px + env(safe-area-inset-top)) 6px calc(4px + env(safe-area-inset-bottom));text-align:center;overflow:hidden}
+.score{font-size:21px;font-weight:800;line-height:1.15;margin:0 0 5px;flex:none}
+.score-dots{display:flex;justify-content:center;gap:7px;margin-top:4px}
+.score-dot{width:12px;height:12px;border-radius:50%;border:1.5px solid #777;background:#fff;display:inline-block}
+.score-dot.blue.on{background:#1769e0;border-color:#1769e0}
+.score-dot.red.on{background:#ed3030;border-color:#ed3030}
+.score .blue-score{color:#1769e0}.score .red-score{color:#ed3030}
+h1{display:none}
+.status{min-height:28px;font-size:17px;line-height:1.25;margin:0 0 6px;flex:none}
+.board{height:min(82dvh,860px);max-height:calc(100dvh - 115px);width:auto;max-width:98vw;aspect-ratio:5/9;margin:0;flex:none;display:grid;grid-template-columns:repeat(5,1fr);grid-template-rows:repeat(9,1fr);border:1px solid #111;background:#fff;touch-action:none}
+.cell{position:relative;border-right:1px solid #222;border-bottom:1px solid #222;background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;user-select:none;-webkit-user-select:none}
+.cell:nth-child(5n){border-right:0}.cell:nth-last-child(-n+5){border-bottom:0}
+.cell.forbidden{background:rgba(128,128,128,.28);cursor:not-allowed}
+.piece{width:58%;aspect-ratio:1;border:2px solid #111;position:absolute;z-index:2;pointer-events:none}
+.piece.blue{background:#1769e0}.piece.red{background:#ed3030}
+.piece.diamond{transform:rotate(45deg);border-radius:2px}
+.placement-ghost{opacity:.72;z-index:5}
+.piece.selected-piece{outline:3px solid #111;outline-offset:2px}
+.winner-dot{width:18px;height:18px;border-radius:50%;background:#000;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);animation:winnerBlink .35s ease-in-out 8;pointer-events:none}
+@keyframes winnerBlink{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.08;transform:scale(.72)}}
+.violet{z-index:6;width:34%;height:34%;background:#8b2bbd;border:1px solid #111;transform:rotate(45deg)}
+
+
+
+.status,.turn,.hint{display:none}
+.controls{display:flex;align-items:center;justify-content:center;gap:18px;width:100%;margin-top:8px;min-height:50px}
+.reset{margin:0;padding:9px 18px;border:1px solid #555;background:#f2f2f2;border-radius:9px;font-weight:700;font-size:16px;color:#1769e0}
+.turn-indicator{display:flex;align-items:center;justify-content:center;margin:0;min-height:44px;font-size:22px;font-weight:800;letter-spacing:.3px}
+.turn-indicator.blue{color:#1769e0}
+.turn-indicator.red{color:#e32626}
+.match-over{font-size:24px;font-weight:900}
+
+
+.lobby{width:min(92vw,430px);display:flex;flex-direction:column;align-items:center;gap:14px}
+.lobby h2{margin:0;font-size:28px}
+.lobby p{margin:0;font-size:17px;line-height:1.3}
+.lobby button,.lobby input{font:inherit;font-size:18px;border-radius:10px;padding:12px 16px;border:1px solid #777;background:#f4f4f4}
+.lobby button{font-weight:800;cursor:pointer}
+.lobby input{width:100%;text-align:center;background:#fff}
+.share-box{width:100%;display:flex;flex-direction:column;gap:8px}
+.share-link{font-size:14px!important}
+.connection{font-size:19px;font-weight:800;min-height:28px}
+.error{color:#c00;font-weight:700;min-height:24px}
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+<div id="lobby" class="lobby">
+  <h2>ROMBO Y CUADRADO</h2>
+  <button id="createBtn">CREAR PARTIDA</button>
+  <div id="joinArea" class="hidden" style="width:100%;display:flex;flex-direction:column;gap:8px">
+    <input id="gameCode" placeholder="Código de partida" maxlength="16" autocomplete="off">
+    <button id="joinBtn">UNIRSE</button>
+  </div>
+  <div id="lobbyMsg" class="connection"></div>
+  <div id="shareBox" class="share-box hidden">
+    <p>Compartí este link con el segundo jugador:</p>
+    <input id="shareLink" class="share-link" readonly>
+    <button id="copyBtn">COPIAR LINK</button>
+    <div id="connectionStatus" class="connection">Esperando al jugador 2...</div>
+  </div>
+  <div id="error" class="error"></div>
+</div>
+
+<div id="game" class="app hidden">
+  <h1>Rombo y Cuadrado</h1>
+  <div id="score" class="score"></div>
+  <div id="status" class="status"></div>
+  <div id="board" class="board"></div>
+  <div id="turn" class="turn"></div>
+  <div id="hint" class="hint"></div>
+  <div class="controls"><div id="turnIndicator" class="turn-indicator"></div><button id="reset" class="reset">Reiniciar</button></div>
+</div>
+<script>const COLS=5, ROWS=9;
+const lobby=document.getElementById('lobby');
+const game=document.getElementById('game');
+const createBtn=document.getElementById('createBtn');
+const joinBtn=document.getElementById('joinBtn');
+const gameCodeInput=document.getElementById('gameCode');
+const lobbyMsg=document.getElementById('lobbyMsg');
+const shareBox=document.getElementById('shareBox');
+const shareLink=document.getElementById('shareLink');
+const copyBtn=document.getElementById('copyBtn');
+const connectionStatus=document.getElementById('connectionStatus');
+const errorEl=document.getElementById('error');
+const board=document.getElementById('board');
+const scoreEl=document.getElementById('score');
+const statusEl=document.getElementById('status');
+const turnEl=document.getElementById('turn');
+const hintEl=document.getElementById('hint');
+const turnIndicator=document.getElementById('turnIndicator');
+const resetBtn=document.getElementById('reset');
+
+// Después de desplegar el servidor en Render, reemplazar esta URL.
+const SERVER_URL = window.GAME_SERVER_URL || 'wss://TU-SERVIDOR-RENDER.onrender.com';
+const tokenKey='romboCuadradoPlayerToken';
+let playerToken=localStorage.getItem(tokenKey);
+if(!playerToken){ playerToken=crypto.randomUUID(); localStorage.setItem(tokenKey,playerToken); }
+
+let ws=null, roomId=null, myColor=null, state=null;
+let pendingPlacement=null, placementTimer=null;
+let selectedPieceId=null;
+let shareBase=location.origin;
+
+function getRoomFromPath(){
+  const m=location.pathname.match(/^\/partida\/([A-Za-z0-9-]+)\/?$/);
+  if(m) return m[1];
+  const q=new URLSearchParams(location.search).get('partida');
+  return q || null;
+}
+function makeRoomUrl(id){ return `${shareBase}/partida/${id}`; }
+function setError(msg){ errorEl.textContent=msg||''; }
+function showGame(){ lobby.classList.add('hidden'); game.classList.remove('hidden'); }
+function showLobby(){ lobby.classList.remove('hidden'); game.classList.add('hidden'); }
+function send(msg){ if(ws && ws.readyState===WebSocket.OPEN) ws.send(JSON.stringify({...msg,token:playerToken,roomId})); }
+function connect(id, autoJoin=false){
+  roomId=id;
+  setError('');
+  if(ws) try{ws.close()}catch{}
+  connectionStatus.textContent='Conectando...';
+  ws=new WebSocket(SERVER_URL);
+  ws.onopen=()=>{
+    if(autoJoin) send({type:'join'});
+    else send({type:'create'});
+  };
+  ws.onmessage=e=>{
+    let msg; try{msg=JSON.parse(e.data)}catch{return;}
+    if(msg.type==='created'){
+      roomId=msg.roomId;
+      history.replaceState({},'',`/partida/${roomId}`);
+      shareLink.value=makeRoomUrl(roomId);
+      shareBox.classList.remove('hidden');
+      lobbyMsg.textContent='Partida creada';
+      connectionStatus.textContent='Esperando al jugador 2...';
+      send({type:'join'});
+      return;
+    }
+    if(msg.type==='joined'){
+      myColor=msg.color;
+      showGame();
+      return;
+    }
+    if(msg.type==='state'){
+      state=msg.state;
+      myColor=msg.yourColor || myColor;
+      if(roomId){
+        shareLink.value=makeRoomUrl(roomId);
+      }
+      if(state.player2Connected){
+        connectionStatus.textContent='🟢 JUGADOR 2 CONECTADO';
+      }else{
+        connectionStatus.textContent='Esperando al jugador 2...';
+      }
+      if(state.player1Connected && state.player2Connected) showGame();
+      renderAll();
+      return;
+    }
+    if(msg.type==='error'){
+      setError(msg.message||'No se pudo conectar.');
+      if(msg.fatal){ try{ws.close()}catch{} }
+      return;
+    }
+    if(msg.type==='reconnected'){
+      myColor=msg.color; showGame(); return;
+    }
+  };
+  ws.onclose=()=>{
+    if(state && state.player1Connected && state.player2Connected){
+      connectionStatus.textContent='🔴 CONEXIÓN PERDIDA — la partida sigue guardada';
+    }
+  };
+  ws.onerror=()=>setError('No se pudo conectar con el servidor.');
+}
+
+createBtn.onclick=()=>connect(null,false);
+joinBtn.onclick=()=>{
+  const id=gameCodeInput.value.trim();
+  if(!id){setError('Ingresá el código de partida.');return;}
+  history.replaceState({},'',`/partida/${id}`);
+  shareLink.value=makeRoomUrl(id);
+  connect(id,true);
+};
+copyBtn.onclick=async()=>{
+  try{await navigator.clipboard.writeText(shareLink.value);copyBtn.textContent='LINK COPIADO';setTimeout(()=>copyBtn.textContent='COPIAR LINK',1200)}catch{shareLink.select();document.execCommand('copy');copyBtn.textContent='LINK COPIADO';}
+};
+gameCodeInput.addEventListener('keydown',e=>{if(e.key==='Enter')joinBtn.click()});
+
+const roomFromUrl=getRoomFromPath();
+if(roomFromUrl){
+  roomId=roomFromUrl;
+  shareLink.value=makeRoomUrl(roomId);
+  lobbyMsg.textContent='Te invitaron a una partida';
+  joinBtn.classList.remove('hidden');
+  document.getElementById('joinArea').classList.remove('hidden');
+  joinBtn.textContent='UNIRSE A LA PARTIDA';
+  createBtn.classList.add('hidden');
+} else {
+  // Solo se ofrece crear una partida; no hay lobby general.
+  document.getElementById('joinArea').classList.add('hidden');
+}
+
+function renderScore(){
+  const blueDots=Array.from({length:5},(_,i)=>`<span class="score-dot blue ${i<(state?.scores?.blue||0)?'on':''}></span>`).join('');
+  const redDots=Array.from({length:5},(_,i)=>`<span class="score-dot red ${i<(state?.scores?.red||0)?'on':''}></span>`).join('');
+  scoreEl.innerHTML=`<div class="score-dots"><span>${blueDots}</span><span style="display:inline-block;width:28px"></span><span>${redDots}</span></div>`;
+}
+function allPieces(){return [...(state?.pieces||[])];}
+function piecesAt(r,c){return allPieces().filter(p=>p.r===r&&p.c===c)}
+function getPlacementOrder(){
+  const first=state?.starter||'blue'; const second=first==='blue'?'red':'blue';
+  return [{color:first},{color:second},{color:first},{color:second}];
+}
+function validPlacement(r,c){
+  const item=getPlacementOrder()[state?.placementIndex||0]; if(!item)return false;
+  for(const p of allPieces()){const dr=Math.abs(p.r-r),dc=Math.abs(p.c-c);if(dr<=1&&dc<=1)return false;}
+  const same=allPieces().find(p=>p.color===item.color);
+  if(same){const dr=Math.abs(same.r-r),dc=Math.abs(same.c-c);const whiteDistance=Math.max(dr-1,0)+Math.max(dc-1,0);if(whiteDistance<3)return false;}
+  return true;
+}
+function clearPlacement(){if(placementTimer){clearTimeout(placementTimer);placementTimer=null}pendingPlacement=null}
+function startPlacementPreview(r,c){
+  clearPlacement();
+  const item=getPlacementOrder()[state.placementIndex];
+  const existing=allPieces().find(p=>p.color===item.color);
+  const forcedShape=existing?(existing.shape==='diamond'?'square':'diamond'):'diamond';
+  pendingPlacement={r,c,color:item.color,shape:forcedShape,rotation:forcedShape==='diamond'?45:0,canRotate:!existing};
+  placementTimer=setTimeout(()=>{if(pendingPlacement) finalizePlacement()},700);
+  renderAll();
+}
+function rotatePlacement(){
+  if(!pendingPlacement?.canRotate)return;
+  pendingPlacement.rotation=(pendingPlacement.rotation+45)%360;
+  pendingPlacement.shape=(pendingPlacement.rotation%90===45)?'diamond':'square';
+  clearTimeout(placementTimer); placementTimer=setTimeout(()=>{if(pendingPlacement)finalizePlacement()},700);
+  renderAll();
+}
+function finalizePlacement(){
+  if(!pendingPlacement || state.phase!=='placement')return;
+  const p={r:pendingPlacement.r,c:pendingPlacement.c,shape:pendingPlacement.shape,rotation:pendingPlacement.rotation};
+  if(!validPlacement(p.r,p.c)){clearPlacement();renderAll();return}
+  send({type:'place',r:p.r,c:p.c,shape:p.shape,rotation:p.rotation});
+  clearPlacement();
+}
+function place(r,c){
+  if(!state || state.phase!=='placement' || state.placementIndex===undefined)return;
+  const item=getPlacementOrder()[state.placementIndex]; if(!item || item.color!==myColor)return;
+  if(pendingPlacement&&pendingPlacement.r===r&&pendingPlacement.c===c){rotatePlacement();return;}
+  if(pendingPlacement)return;
+  if(!validPlacement(r,c)){renderAll();return;}
+  startPlacementPreview(r,c);
+}
+function canMovePiece(p,r,c){
+  if(!p)return false; const dr=r-p.r,dc=c-p.c,adr=Math.abs(dr),adc=Math.abs(dc);
+  const one=p.shape==='diamond'?((adr===1&&adc===0)||(adr===0&&adc===1)):(adr===1&&adc===1);
+  if(one)return true;
+  const target=piecesAt(r,c).find(q=>q.color!==p.color); if(!target)return false;
+  let sr=0,sc=0;
+  if(p.shape==='diamond'){if(adr===0&&adc>0)sc=dc>0?1:-1;else if(adc===0&&adr>0)sr=dr>0?1:-1;else return false;}
+  else {if(adr!==adc||adr===0)return false;sr=dr>0?1:-1;sc=dc>0?1:-1;}
+  let rr=p.r+sr,cc=p.c+sc;while(rr!==r||cc!==c){if(piecesAt(rr,cc).length>0)return false;rr+=sr;cc+=sc;}return true;
+}
+function gameClick(r,c){
+  if(!state||state.phase!=='start'||state.turnColor!==myColor)return;
+  const targets=piecesAt(r,c), own=targets.filter(p=>p.color===myColor), enemy=targets.find(p=>p.color!==myColor);
+  if(!selectedPieceId){if(own.length){selectedPieceId=own[0].id;renderAll()}return;}
+  if(own.length){const mine=allPieces().filter(p=>p.color===myColor);const idx=mine.findIndex(p=>p.id===selectedPieceId);selectedPieceId=idx>=0?mine[(idx+1)%mine.length].id:own[0].id;renderAll();return;}
+  const selected=allPieces().find(p=>p.id===selectedPieceId); if(!selected||!canMovePiece(selected,r,c))return;
+  send({type:'move',pieceId:selected.id,r,c}); selectedPieceId=null;
+}
+function renderTurnIndicator(){
+  if(!state){turnIndicator.textContent='';return}
+  let who=null;
+  if(state.phase==='placement'){who=getPlacementOrder()[state.placementIndex]?.color||state.starter}
+  else if(state.phase==='start')who=state.turnColor;
+  else if(state.phase==='finished'&&state.matchWinner){turnIndicator.textContent=state.matchWinner==='blue'?'GANA AZUL':'GANA ROJO';turnIndicator.className='turn-indicator '+state.matchWinner+' match-over';return}
+  turnIndicator.textContent=who?'MUEVE '+(who==='blue'?'AZUL':'ROJO'):'';turnIndicator.className='turn-indicator '+(who||'');
+}
+function renderAll(){
+  if(!state)return;
+  renderScore(); renderTurnIndicator();
+  const connected=state.player1Connected&&state.player2Connected;
+  if(!connected){
+    const other=state.player1Connected?'JUGADOR 2':'JUGADOR 1';
+    statusEl.textContent=`🔴 ${other} DESCONECTADO — la partida sigue guardada`;
+  }else if(state.phase==='finished'){
+    statusEl.textContent=state.matchWinner?`¡GANA EL PARTIDO ${state.matchWinner==='blue'?'AZUL':'ROJO'}!`:(state.winnerColor?`¡Gana el jugador ${state.winnerColor==='blue'?'AZUL':'ROJO'}!`:'¡EMPATE!');
+  }else{
+    statusEl.textContent='';
+  }
+  if(state.phase==='start')turnEl.textContent=state.turnColor===myColor?'Es tu turno':'Turno del otro jugador'; else turnEl.textContent='';
+  hintEl.textContent=!connected?'La partida no se corta. Cuando el jugador vuelva, continúa desde acá.':(state.phase==='placement'?'Cada jugador coloca sus dos piezas.':'');
+  board.innerHTML='';
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+    const cell=document.createElement('div');cell.className='cell';
+    if(state.phase==='placement'&&!validPlacement(r,c))cell.classList.add('forbidden');
+    if(state.phase==='placement')cell.onclick=()=>place(r,c); else if(state.phase==='start')cell.onclick=()=>gameClick(r,c);
+    board.appendChild(cell);
+  }
+  const cells=[...board.children];
+  const groups={}; allPieces().forEach(p=>{const k=`${p.r}-${p.c}`;(groups[k]??=[]).push(p)});
+  for(const group of Object.values(groups)){
+    const cell=cells[group[0].r*COLS+group[0].c];if(!cell)continue;
+    group.forEach((p,i)=>{const el=document.createElement('div');el.className=`piece ${p.color} ${p.shape}`;if(selectedPieceId===p.id)el.classList.add('selected-piece');if(group.length>1)el.style.transform=i===0?'translateX(-14%) rotate(45deg)':'translateX(14%)';cell.appendChild(el);if(state.phase==='finished'&&state.winnerColor===p.color){const dot=document.createElement('div');dot.className='winner-dot';cell.appendChild(dot)}});
+    if(group.length>1){const v=document.createElement('div');v.className='piece violet';cell.appendChild(v)}
+  }
+  if(pendingPlacement&&state.phase==='placement'){const cell=cells[pendingPlacement.r*COLS+pendingPlacement.c];if(cell){const ghost=document.createElement('div');ghost.className=`piece ${pendingPlacement.color} ${pendingPlacement.shape} placement-ghost`;ghost.style.transform=`rotate(${pendingPlacement.rotation}deg)`;cell.appendChild(ghost)}}
+}
+resetBtn.onclick=()=>send({type:'reset'});
+
+// Si el usuario abre un link de invitación, se conecta automáticamente.
+if(roomFromUrl){connect(roomFromUrl,true)}
+</script></body>

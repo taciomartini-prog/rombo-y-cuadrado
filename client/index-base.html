@@ -1,0 +1,579 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Rombo y Cuadrado">
+<meta name="theme-color" content="#ffffff">
+<title>Rombo y Cuadrado</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;min-height:100dvh;overflow:hidden;background:#fff;color:#222;font-family:Arial,sans-serif;touch-action:none;position:fixed;inset:0}
+body{display:flex;justify-content:center;align-items:center}
+.app{width:100%;height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:calc(4px + env(safe-area-inset-top)) 6px calc(4px + env(safe-area-inset-bottom));text-align:center;overflow:hidden}
+.score{font-size:21px;font-weight:800;line-height:1.15;margin:0 0 5px;flex:none}
+.score-dots{display:flex;justify-content:center;gap:7px;margin-top:4px}
+.score-dot{width:12px;height:12px;border-radius:50%;border:1.5px solid #777;background:#fff;display:inline-block}
+.score-dot.blue.on{background:#1769e0;border-color:#1769e0}
+.score-dot.red.on{background:#ed3030;border-color:#ed3030}
+.score .blue-score{color:#1769e0}.score .red-score{color:#ed3030}
+h1{display:none}
+.status{min-height:28px;font-size:17px;line-height:1.25;margin:0 0 6px;flex:none}
+.board{height:min(82dvh,860px);max-height:calc(100dvh - 115px);width:auto;max-width:98vw;aspect-ratio:5/9;margin:0;flex:none;display:grid;grid-template-columns:repeat(5,1fr);grid-template-rows:repeat(9,1fr);border:1px solid #111;background:#fff;touch-action:none}
+.cell{position:relative;border-right:1px solid #222;border-bottom:1px solid #222;background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;user-select:none;-webkit-user-select:none}
+.cell:nth-child(5n){border-right:0}.cell:nth-last-child(-n+5){border-bottom:0}
+.cell.forbidden{background:rgba(128,128,128,.28);cursor:not-allowed}
+.piece{width:58%;aspect-ratio:1;border:2px solid #111;position:absolute;z-index:2;pointer-events:none}
+.piece.blue{background:#1769e0}.piece.red{background:#ed3030}
+.piece.diamond{transform:rotate(45deg);border-radius:2px}
+.placement-ghost{opacity:.72;z-index:5}
+.piece.selected-piece{outline:3px solid #111;outline-offset:2px}
+.winner-dot{width:18px;height:18px;border-radius:50%;background:#000;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);animation:winnerBlink .35s ease-in-out 8;pointer-events:none}
+@keyframes winnerBlink{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.08;transform:scale(.72)}}
+.violet{z-index:6;width:34%;height:34%;background:#8b2bbd;border:1px solid #111;transform:rotate(45deg)}
+
+
+
+.status,.turn,.hint{display:none}
+.controls{display:flex;align-items:center;justify-content:center;gap:18px;width:100%;margin-top:8px;min-height:50px}
+.reset{margin:0;padding:9px 18px;border:1px solid #555;background:#f2f2f2;border-radius:9px;font-weight:700;font-size:16px;color:#1769e0}
+.turn-indicator{display:flex;align-items:center;justify-content:center;margin:0;min-height:44px;font-size:22px;font-weight:800;letter-spacing:.3px}
+.turn-indicator.blue{color:#1769e0}
+.turn-indicator.red{color:#e32626}
+.match-over{font-size:24px;font-weight:900}
+
+</style>
+</head>
+<body>
+<div class="app">
+<h1>Rombo y Cuadrado</h1>
+<div id="score" class="score"></div>
+<div id="status" class="status"></div>
+<div id="board" class="board"></div>
+<div id="turn" class="turn"></div>
+<div id="hint" class="hint"></div>
+<div class="controls"><div id="turnIndicator" class="turn-indicator"></div><button id="reset" class="reset">Reiniciar</button></div>
+</div>
+<script>
+const COLS=5, ROWS=9;
+let phase='placement';
+let bluePieces=[], redPieces=[];
+let placementIndex=0;
+let selectedPiece=null;
+
+// El primer jugador de la partida actual.
+// Las partidas siguientes alternan automáticamente.
+let currentStarter='blue';
+let nextStarter='red';
+let turnColor='blue';
+let matchWinner=null;
+
+function getPlacementOrder(){
+  const first=currentStarter;
+  const second=first==='blue'?'red':'blue';
+  return [
+    {color:first,name:`pieza ${first}`},
+    {color:second,name:`pieza ${second}`},
+    {color:first,name:`segunda pieza ${first}`},
+    {color:second,name:`segunda pieza ${second}`}
+  ];
+}
+let pendingPlacement=null;
+let placementTimer=null;
+let spinTimer=null;
+let lastPlacedPiece=null;
+let revealed=false;
+let moveCount={blue:0,red:0};
+let winnerColor=null;
+const SCORE_KEY='romboCuadradoScores_v8';
+let scores=JSON.parse(localStorage.getItem(SCORE_KEY)||'null')||{blue:0,red:0};
+
+const board=document.getElementById('board');
+const scoreEl=document.getElementById('score');
+const statusEl=document.getElementById('status');
+const turnEl=document.getElementById('turn');
+const hintEl=document.getElementById('hint');
+
+function saveScores(){localStorage.setItem(SCORE_KEY,JSON.stringify(scores))}
+function renderScore(){
+  const blueDots=Array.from({length:5},(_,i)=>`<span class="score-dot blue ${i<scores.blue?'on':''}"></span>`).join('');
+  const redDots=Array.from({length:5},(_,i)=>`<span class="score-dot red ${i<scores.red?'on':''}"></span>`).join('');
+  scoreEl.innerHTML=
+    `<div class="score-dots"><span>${blueDots}</span><span style="display:inline-block;width:28px"></span><span>${redDots}</span></div>`;
+}
+function allPieces(){return [...bluePieces,...redPieces]}
+function piecesAt(r,c){return allPieces().filter(p=>p.r===r&&p.c===c)}
+
+function validPlacement(r,c){
+  const item=getPlacementOrder()[placementIndex];
+  if(!item)return false;
+
+  // Regla general: una pieza nueva no puede quedar pegada a ninguna otra,
+  // tampoco en diagonal. Debe existir al menos una celda libre entre ellas.
+  for(const p of allPieces()){
+    const dr=Math.abs(p.r-r), dc=Math.abs(p.c-c);
+    if(dr<=1 && dc<=1)return false;
+  }
+
+  // Regla adicional para la segunda pieza del mismo color:
+  // (|dr|-1) + (|dc|-1), sin valores negativos, debe ser >= 3.
+  const same=allPieces().find(p=>p.color===item.color);
+  if(same){
+    const dr=Math.abs(same.r-r), dc=Math.abs(same.c-c);
+    const whiteDistance=Math.max(dr-1,0)+Math.max(dc-1,0);
+    if(whiteDistance<3)return false;
+  }
+  return true;
+}
+
+function clearPlacementTimers(){
+  if(placementTimer){ clearTimeout(placementTimer); placementTimer=null; }
+  if(spinTimer){ clearInterval(spinTimer); spinTimer=null; }
+}
+
+function startPlacementPreview(r,c){
+  clearPlacementTimers();
+  lastPlacedPiece=null;
+
+  const color=getPlacementOrder()[placementIndex].color;
+  const existing=allPieces().find(p=>p.color===color);
+  const forcedShape=existing
+    ? (existing.shape==="diamond" ? "square" : "diamond")
+    : "diamond";
+
+  pendingPlacement={
+    r,
+    c,
+    color,
+    shape:forcedShape,
+    rotation:forcedShape==="diamond" ? 45 : 0,
+    canRotate:!existing
+  };
+
+  render();
+
+  // Si no vuelve a tocar la pieza durante este instante, se fija.
+  placementTimer=setTimeout(()=>{
+    if(pendingPlacement) finalizePlacement();
+  },700);
+}
+
+function rotatePlacement(){
+  if(!pendingPlacement || !pendingPlacement.canRotate) return;
+
+  // Cada tap = exactamente 45°.
+  pendingPlacement.rotation=(pendingPlacement.rotation+45)%360;
+
+  // 45° = rombo; 0°/90° = cuadrado visualmente.
+  pendingPlacement.shape=
+    (pendingPlacement.rotation%90===45) ? "diamond" : "square";
+
+  render();
+
+  // Cada nueva rotación reinicia el tiempo antes de fijarla.
+  clearTimeout(placementTimer);
+  placementTimer=setTimeout(()=>{
+    if(pendingPlacement) finalizePlacement();
+  },700);
+}
+
+function finalizePlacement(){
+  if(!pendingPlacement || phase!=="placement") return;
+  clearPlacementTimers();
+
+  const item=getPlacementOrder()[placementIndex];
+  const {r,c,shape}=pendingPlacement;
+
+  if(!validPlacement(r,c)){
+    pendingPlacement=null;
+    render();
+    statusEl.textContent="Esa casilla no es válida.";
+    return;
+  }
+
+  const piece={color:item.color,shape,r,c};
+  if(item.color==="blue") bluePieces.push(piece);
+  else redPieces.push(piece);
+
+  lastPlacedPiece=piece;
+  pendingPlacement=null;
+  placementIndex++;
+
+  if(placementIndex>=getPlacementOrder().length){
+    phase="start";
+    revealed=true;
+    turnColor=currentStarter;
+    statusEl.textContent="¡Comienza la partida!";
+    turnEl.textContent=`Turno del jugador ${turnColor==="blue"?"AZUL":"ROJO"}`;
+    hintEl.textContent="Seleccioná una de tus piezas para moverla.";
+  }else{
+    const next=getPlacementOrder()[placementIndex];
+    statusEl.textContent=`Ahora coloca el ${next.name.toLowerCase()}.`;
+    turnEl.textContent=`Coloca: ${next.name}`;
+    hintEl.textContent="Primer tap: rombo. Cada tap rápido gira 45°. Si esperás, se fija.";
+  }
+  render();
+}
+
+function place(r,c){
+  if(phase!=="placement") return;
+
+  if(pendingPlacement && pendingPlacement.r===r && pendingPlacement.c===c){
+    // Segundo tap (y siguientes): un único giro de 45°.
+    rotatePlacement();
+    return;
+  }
+
+  if(pendingPlacement){
+    // Mientras la pieza está previsualizada, tocar otra casilla
+    // no la mueve ni genera un error. El segundo tap válido es
+    // sobre la misma pieza y la hace girar 45°.
+    return;
+  }
+
+  if(!validPlacement(r,c)){
+    statusEl.textContent="Esa casilla no es válida.";
+    hintEl.textContent="Debe respetar la separación y la distancia mínima. Cada color debe tener un rombo y un cuadrado.";
+    render();
+    return;
+  }
+
+  startPlacementPreview(r,c);
+}
+
+
+function canMovePiece(p,r,c){
+  if(!p) return false;
+
+  const dr=r-p.r;
+  const dc=c-p.c;
+  const adr=Math.abs(dr);
+  const adc=Math.abs(dc);
+
+  // Movimiento normal: exactamente un casillero.
+  const oneStep=p.shape==='diamond'
+    ? ((adr===1&&adc===0)||(adr===0&&adc===1))
+    : (adr===1&&adc===1);
+
+  if(oneStep) return true;
+
+  // Captura a distancia: puede atravesar casilleros vacíos
+  // y comer la primera pieza rival que encuentre en su línea.
+  const target=piecesAt(r,c).find(q=>q.color!==p.color);
+  if(!target) return false;
+
+  let sr=0,sc=0;
+
+  if(p.shape==='diamond'){
+    if(adr===0 && adc>0){
+      sc=dc>0?1:-1;
+    }else if(adc===0 && adr>0){
+      sr=dr>0?1:-1;
+    }else{
+      return false;
+    }
+  }else{
+    if(adr!==adc || adr===0) return false;
+    sr=dr>0?1:-1;
+    sc=dc>0?1:-1;
+  }
+
+  // No se puede saltar ninguna pieza: el objetivo debe ser
+  // la primera pieza que aparece en esa dirección.
+  let rr=p.r+sr, cc=p.c+sc;
+  while(rr!==r || cc!==c){
+    if(piecesAt(rr,cc).length>0) return false;
+    rr+=sr;
+    cc+=sc;
+  }
+
+  return true;
+}
+
+function hasVictory(color){
+  const own=color==='blue'?bluePieces:redPieces;
+  const enemy=color==='blue'?redPieces:bluePieces;
+
+  // Capturar una pieza rival.
+  if(enemy.length<2) return true;
+
+  // Las dos piezas propias quedan adyacentes, también en diagonal.
+  if(own.length===2){
+    const dr=Math.abs(own[0].r-own[1].r);
+    const dc=Math.abs(own[0].c-own[1].c);
+    if(dr<=1 && dc<=1 && (dr+dc)>0) return true;
+  }
+
+  return false;
+}
+
+function finishResult(){
+  const blueWin=hasVictory('blue');
+  const redWin=hasVictory('red');
+
+  if(!blueWin && !redWin) return false;
+  if(moveCount.blue!==moveCount.red) return false;
+
+  phase='finished';
+  winnerColor=(blueWin && !redWin)?'blue':(redWin && !blueWin)?'red':null;
+
+  if(blueWin && redWin){
+    statusEl.textContent='¡EMPATE!';
+    turnEl.textContent='';
+    hintEl.textContent='';
+    matchWinner=null;
+  }else if(winnerColor){
+    scores[winnerColor]++;
+    saveScores();
+    renderScore();
+
+    if(scores[winnerColor]>=5){
+      matchWinner=winnerColor;
+      statusEl.textContent=`¡GANA EL PARTIDO ${winnerColor==='blue'?'AZUL':'ROJO'}!`;
+      turnEl.textContent=`Llegó a 5 puntos.`;
+      hintEl.textContent='Presioná Reiniciar para comenzar un nuevo partido.';
+    }else{
+      matchWinner=null;
+      statusEl.textContent=`¡Gana el jugador ${winnerColor==='blue'?'AZUL':'ROJO'}!`;
+      turnEl.textContent='';
+      hintEl.textContent='';
+    }
+  }
+
+  return true;
+}
+function gameClick(r,c){
+  if(phase!=='start')return;
+
+  const targets=piecesAt(r,c);
+  const own=targets.filter(p=>p.color===turnColor);
+  const enemy=targets.find(p=>p.color!==turnColor);
+
+  if(!selectedPiece){
+    if(own.length){selectedPiece=own[0];render()}
+    return;
+  }
+
+  if(own.length){
+    const idx=own.indexOf(selectedPiece);
+    selectedPiece=idx>=0 ? own[(idx+1)%own.length] : own[0];
+    render();
+    return;
+  }
+
+  if(!canMovePiece(selectedPiece,r,c))return;
+
+  if(enemy){
+    const arr=enemy.color==='blue'?bluePieces:redPieces;
+    const i=arr.indexOf(enemy);
+    if(i>=0)arr.splice(i,1);
+  }
+
+  selectedPiece.r=r;
+  selectedPiece.c=c;
+  selectedPiece=null;
+
+  const mover=turnColor;
+  moveCount[mover]++;
+
+  // No se declara victoria todavía si los movimientos no están igualados.
+  // El rival tiene su turno para igualar la cantidad de movimientos.
+  if(finishResult()){
+    // La pieza ya se movió y, si hubo captura, debe verse
+    // ocupando la casilla capturada antes de mostrar el resultado.
+    render();
+    return;
+  }
+
+  turnColor=turnColor==='blue'?'red':'blue';
+  render();
+}
+
+
+function previewCanCapture(r,c){
+  if(!pendingPlacement) return false;
+  const dr=Math.abs(r-pendingPlacement.r);
+  const dc=Math.abs(c-pendingPlacement.c);
+
+  if(pendingPlacement.shape==="diamond"){
+    return (dr===1 && dc===0) || (dr===0 && dc===1);
+  }
+  return dr===1 && dc===1;
+}
+
+function pieceCanReach(piece,r,c){
+  if(!piece) return false;
+  const dr=Math.abs(r-piece.r), dc=Math.abs(c-piece.c);
+  if(piece.shape==="diamond"){
+    return (dr===1 && dc===0) || (dr===0 && dc===1);
+  }
+  return dr===1 && dc===1;
+}
+
+
+
+
+function startNextGameAutomatically(){
+  clearPlacementTimers();
+  bluePieces=[];
+  redPieces=[];
+  placementIndex=0;
+  selectedPiece=null;
+  pendingPlacement=null;
+  moveCount={blue:0,red:0};
+  winnerColor=null;
+  matchWinner=null;
+  phase='placement';
+
+  // El ganador de la partida actual no necesariamente comienza la siguiente:
+  // se mantiene la alternancia azul/rojo.
+  turnColor=nextStarter;
+  nextStarter=nextStarter==='blue'?'red':'blue';
+
+  statusEl.textContent='';
+  turnEl.textContent='';
+  hintEl.textContent='';
+  render();
+}
+
+function renderTurnIndicator(){
+  const el=document.getElementById('turnIndicator');
+  if(!el) return;
+
+  let who=null;
+  if(phase==='placement'){
+    const order=getPlacementOrder();
+    who=order[placementIndex]?.color || currentStarter;
+  }else if(phase==='start'){
+    who=turnColor;
+  }else if(phase==='finished' && matchWinner){
+    el.textContent=(matchWinner==='blue'?'GANA AZUL':'GANA ROJO');
+    el.className='turn-indicator '+matchWinner+' match-over';
+    return;
+  }
+
+  if(who){
+    el.textContent='MUEVE '+(who==='blue'?'AZUL':'ROJO');
+    el.className='turn-indicator '+who;
+  }else{
+    el.textContent='';
+    el.className='turn-indicator';
+  }
+}
+
+function render(){
+  renderTurnIndicator();
+  board.innerHTML='';
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+    const cell=document.createElement('div');cell.className='cell';
+    if(phase==='placement'){
+      if(!validPlacement(r,c))cell.classList.add('forbidden');
+      cell.onclick=()=>place(r,c);
+    }else if(phase==='start'){
+      cell.onclick=()=>gameClick(r,c);
+    }
+    board.appendChild(cell);
+  }
+
+  const cells=[...board.children];
+
+  const groups={};
+  allPieces().forEach(p=>{const k=`${p.r}-${p.c}`;(groups[k]??=[]).push(p)});
+
+  for(const group of Object.values(groups)){
+    const cell=cells[group[0].r*COLS+group[0].c];if(!cell)continue;
+    if(group.length===1){
+      const p=group[0],el=document.createElement('div');
+      el.className=`piece ${p.color} ${p.shape}`;
+      if(selectedPiece===p)el.classList.add('selected-piece');
+      cell.appendChild(el);
+      if(phase==='finished' && winnerColor===p.color){
+        const dot=document.createElement('div');
+        dot.className='winner-dot';
+        cell.appendChild(dot);
+      }
+    }else{
+      group.forEach((p,i)=>{
+        const el=document.createElement('div');el.className=`piece ${p.color} ${p.shape}`;
+        el.style.transform=i===0?'translateX(-14%) rotate(45deg)':'translateX(14%)';
+        cell.appendChild(el);
+        if(phase==='finished' && winnerColor===p.color){
+          const dot=document.createElement('div');
+          dot.className='winner-dot';
+          cell.appendChild(dot);
+        }
+      });
+      const v=document.createElement('div');v.className='piece violet';cell.appendChild(v);
+    }
+  }
+
+  if(pendingPlacement && phase==='placement'){
+    const cell=cells[pendingPlacement.r*COLS+pendingPlacement.c];
+    if(cell){
+      const ghost=document.createElement('div');
+      ghost.className=`piece ${getPlacementOrder()[placementIndex].color} ${pendingPlacement.shape} placement-ghost`;
+      ghost.style.transform=`rotate(${pendingPlacement.rotation}deg)`;
+      cell.appendChild(ghost);
+    }
+  }
+}
+
+document.getElementById('reset').onclick=()=>{
+  // Si la partida está en curso, Reiniciar equivale a abandonar:
+  // pierde quien tiene el turno y el punto va al rival.
+  if(phase==='start'){
+    const loser=turnColor;
+    const winner=loser==='blue'?'red':'blue';
+    scores[winner]++;
+    saveScores();
+    renderScore();
+
+    if(scores[winner]>=5){
+      matchWinner=winner;
+      phase='finished';
+      statusEl.textContent=`¡GANA EL PARTIDO ${winner==='blue'?'AZUL':'ROJO'}!`;
+      turnEl.textContent='Llegó a 5 puntos.';
+      hintEl.textContent='Presioná Reiniciar para comenzar un nuevo partido.';
+      render();
+      return;
+    }
+
+    // La próxima partida comienza el color contrario al que comenzó ésta.
+    nextStarter=currentStarter==='blue'?'red':'blue';
+    currentStarter=nextStarter;
+  }
+  else if(phase==='finished' && matchWinner){
+    // Partido terminado: comienza una nueva serie y el primer jugador alterna.
+    currentStarter=currentStarter==='blue'?'red':'blue';
+  }
+  // Durante la colocación, Reiniciar NO suma ni resta puntos
+  // y mantiene quién va a comenzar la partida.
+
+  clearPlacementTimers();
+  bluePieces=[];
+  redPieces=[];
+  placementIndex=0;
+  selectedPiece=null;
+  pendingPlacement=null;
+  moveCount={blue:0,red:0};
+  winnerColor=null;
+  matchWinner=null;
+  phase='placement';
+  turnColor=currentStarter;
+
+  statusEl.textContent='';
+  turnEl.textContent='';
+  hintEl.textContent='';
+  render();
+};
+
+renderScore();
+statusEl.textContent='';
+turnEl.textContent='';
+hintEl.textContent=pendingPlacement && !pendingPlacement.canRotate ? 'Esta es la segunda pieza: su forma es obligatoriamente la opuesta a la primera.' : 'Primer tap: aparece el rombo. Cada tap gira 45°. Si esperás, se fija.';
+render();
+</script>
+</body>
+</html>
