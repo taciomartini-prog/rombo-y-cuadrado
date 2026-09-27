@@ -15,7 +15,8 @@ body{display:flex;justify-content:center;align-items:center}
 .app{width:100%;height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:calc(4px + env(safe-area-inset-top)) 6px calc(4px + env(safe-area-inset-bottom));text-align:center;overflow:hidden}
 .score{font-size:21px;font-weight:800;line-height:1.15;margin:0 0 5px;flex:none;width:100%;display:flex;justify-content:center}
 .score-dots{display:flex;justify-content:center;align-items:center;gap:26px;margin-top:4px}
-.score-dot-group{display:flex;gap:6px;align-items:center}.score-dot{width:13px;height:13px;border-radius:50%;border:1.5px solid #777;background:#fff;display:inline-block}
+.score-dot-group{display:flex;gap:6px;align-items:center}.score-dot{width:14px;height:14px;border-radius:50%;border:1.5px solid #777;background:#fff;display:inline-block}
+.score-dot.blue{border-color:#1769e0}.score-dot.red{border-color:#ed3030}
 .score-dot.blue.on{background:#1769e0;border-color:#1769e0}
 .score-dot.red.on{background:#ed3030;border-color:#ed3030}
 .score .blue-score{color:#1769e0}.score .red-score{color:#ed3030}
@@ -64,16 +65,17 @@ h1{display:none}
 .tcard-head{display:flex;align-items:center;gap:8px;padding:10px 9px 9px;background:#f8faff;color:#111a3a;font-size:16px;font-weight:900;line-height:1.05;min-height:58px}
 .tnum{width:30px;height:30px;flex:none;border-radius:50%;background:#1769e0;color:#fff;display:flex;align-items:center;justify-content:center;font-size:17px}
 .tcard-body{padding:8px 8px 10px}
-.tgrid{width:100%;aspect-ratio:5/9;display:grid;grid-template-columns:repeat(5,1fr);grid-template-rows:repeat(9,1fr);border:1px solid #222;background:#fff;position:relative}
-.tcell{border-right:1px solid #777;border-bottom:1px solid #777;position:relative}
+.tgrid{width:100%;aspect-ratio:5/9;display:grid;grid-template-columns:repeat(5,1fr);grid-template-rows:repeat(9,1fr);border:1px solid #222;background:#fff;position:relative;overflow:visible}
+.tcell{border-right:1px solid #777;border-bottom:1px solid #777;position:relative;overflow:visible}
 .tcell:nth-child(5n){border-right:0}.tcell:nth-last-child(-n+5){border-bottom:0}
-.tpiece{position:absolute;width:9.5%;aspect-ratio:1;left:50%;top:50%;transform:translate(-50%,-50%);border:2px solid #111;z-index:2}
-.tpiece.diamond{transform:translate(-50%,-50%) rotate(45deg);border-radius:2px}
+.tpiece{position:absolute;width:58%;height:58%;left:21%;top:21%;border:2px solid #111;z-index:4}
+.tpiece.diamond{transform:rotate(45deg);border-radius:2px}
 .tpiece.blue{background:#1769e0}.tpiece.red{background:#ed3030}.tpiece.black{background:#111}
-.tarrow{position:absolute;inset:0;z-index:3;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:900;line-height:1}
-.tarrow.blue{color:#1769e0}.tarrow.red{color:#ed3030}.tarrow.gray{color:#666}
-.tarrow.up{left:31%;top:0}.tarrow.down{left:31%;bottom:0}.tarrow.left{left:0;top:31%}.tarrow.right{right:0;top:31%}
-.tarrow.ur{right:1%;top:1%}.tarrow.ul{left:1%;top:1%}.tarrow.dr{right:1%;bottom:1%}.tarrow.dl{left:1%;bottom:1%}
+.tarrow{position:absolute;width:95%;height:3px;left:50%;top:50%;z-index:3;background:currentColor;transform-origin:left center}
+.tarrow:after{content:"";position:absolute;right:-1px;top:50%;transform:translateY(-50%);width:0;height:0;border-top:7px solid transparent;border-bottom:7px solid transparent;border-left:11px solid currentColor}
+.tarrow.up{transform:rotate(-90deg)}.tarrow.down{transform:rotate(90deg)}.tarrow.left{transform:rotate(180deg)}.tarrow.right{transform:rotate(0deg)}
+.tarrow.ul{transform:rotate(-135deg)}.tarrow.ur{transform:rotate(-45deg)}.tarrow.dl{transform:rotate(135deg)}.tarrow.dr{transform:rotate(45deg)}
+.tarrow.blue{color:#1769e0}.tarrow.red{color:#ed3030}.tarrow.gray{color:#555}
 .tlegend{display:flex;align-items:center;gap:9px;margin-top:9px}
 .ticon{width:32px;height:32px;border:2px solid #111;flex:none;background:#fff}
 .ticon.diamond{transform:rotate(45deg)}
@@ -170,41 +172,40 @@ function buildTutorialGrid(id,capture){
     e.className=`tpiece ${color}${shape?' '+shape:''}`;
     cell.appendChild(e);
   };
-  const addArrow=(row,col,color,text)=>{
+  const addArrow=(row,col,color,direction)=>{
     const cell=g.children[row*5+col];
     const e=document.createElement('div');
-    e.className=`tarrow ${color}`;
-    e.textContent=text;
+    e.className=`tarrow ${color} ${direction}`;
     cell.appendChild(e);
   };
 
   if(!capture){
     // Rombo azul: movimiento ortogonal, un casillero.
     addPiece(1,2,'blue','diamond');
-    addArrow(0,2,'blue','↑'); addArrow(2,2,'blue','↓');
-    addArrow(1,1,'blue','←'); addArrow(1,3,'blue','→');
+    addArrow(1,2,'blue','up'); addArrow(1,2,'blue','down');
+    addArrow(1,2,'blue','left'); addArrow(1,2,'blue','right');
 
     // Rombo rojo: movimiento ortogonal, un casillero.
     addPiece(4,3,'red','diamond');
-    addArrow(3,3,'red','↑'); addArrow(5,3,'red','↓');
-    addArrow(4,2,'red','←'); addArrow(4,4,'red','→');
+    addArrow(4,3,'red','up'); addArrow(4,3,'red','down');
+    addArrow(4,3,'red','left'); addArrow(4,3,'red','right');
 
     // Cuadrado azul: movimiento diagonal, un casillero.
     addPiece(6,1,'blue','');
-    addArrow(5,0,'blue','↖'); addArrow(5,2,'blue','↗');
-    addArrow(7,0,'blue','↙'); addArrow(7,2,'blue','↘');
+    addArrow(6,1,'blue','ul'); addArrow(6,1,'blue','ur');
+    addArrow(6,1,'blue','dl'); addArrow(6,1,'blue','dr');
 
     // Cuadrado rojo: movimiento diagonal, un casillero.
     addPiece(7,3,'red','');
-    addArrow(6,2,'red','↖'); addArrow(6,4,'red','↗');
-    addArrow(8,2,'red','↙'); addArrow(8,4,'red','↘');
+    addArrow(7,3,'red','ul'); addArrow(7,3,'red','ur');
+    addArrow(7,3,'red','dl'); addArrow(7,3,'red','dr');
   }else{
     // Ejemplo de captura a distancia.
     addPiece(1,2,'blue','diamond');
     addPiece(4,3,'black','diamond');
     addPiece(6,1,'blue','');
     addPiece(7,3,'red','');
-    addArrow(5,2,'gray','↗');
+    addArrow(6,1,'gray','ur');
   }
 }
 buildTutorialGrid('tutorialGrid1',false); buildTutorialGrid('tutorialGrid2',true);
@@ -327,7 +328,7 @@ if(roomFromUrl){
 function renderScore(){
   const blueDots=Array.from({length:5},(_,i)=>`<span class="score-dot blue ${i<(state?.scores?.blue||0)?'on':''}></span>`).join('');
   const redDots=Array.from({length:5},(_,i)=>`<span class="score-dot red ${i<(state?.scores?.red||0)?'on':''}></span>`).join('');
-  scoreEl.innerHTML=`<div class="score-dots"><span class="score-dot-group">${blueDots}</span><span class="score-dot-group">${redDots}</span></div>`;
+  scoreEl.innerHTML=`<div class="score-dots"><div class="score-dot-group blue-group">${blueDots}</div><div class="score-dot-group red-group">${redDots}</div></div>`;
 }
 function allPieces(){return [...(state?.pieces||[])];}
 function piecesAt(r,c){return allPieces().filter(p=>p.r===r&&p.c===c)}
