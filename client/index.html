@@ -67,10 +67,10 @@ h1{display:none}
 .tgrid{width:100%;aspect-ratio:5/9;display:grid;grid-template-columns:repeat(5,1fr);grid-template-rows:repeat(9,1fr);border:1px solid #222;background:#fff;position:relative}
 .tcell{border-right:1px solid #777;border-bottom:1px solid #777;position:relative}
 .tcell:nth-child(5n){border-right:0}.tcell:nth-last-child(-n+5){border-bottom:0}
-.tpiece{position:absolute;width:62%;aspect-ratio:1;left:50%;top:50%;transform:translate(-50%,-50%);border:2px solid #111;z-index:2}
+.tpiece{position:absolute;width:9.5%;aspect-ratio:1;left:50%;top:50%;transform:translate(-50%,-50%);border:2px solid #111;z-index:2}
 .tpiece.diamond{transform:translate(-50%,-50%) rotate(45deg);border-radius:2px}
 .tpiece.blue{background:#1769e0}.tpiece.red{background:#ed3030}.tpiece.black{background:#111}
-.tarrow{position:absolute;width:38%;height:38%;z-index:3;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:900;line-height:1}
+.tarrow{position:absolute;inset:0;z-index:3;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:900;line-height:1}
 .tarrow.blue{color:#1769e0}.tarrow.red{color:#ed3030}.tarrow.gray{color:#666}
 .tarrow.up{left:31%;top:0}.tarrow.down{left:31%;bottom:0}.tarrow.left{left:0;top:31%}.tarrow.right{right:0;top:31%}
 .tarrow.ur{right:1%;top:1%}.tarrow.ul{left:1%;top:1%}.tarrow.dr{right:1%;bottom:1%}.tarrow.dl{left:1%;bottom:1%}
@@ -163,20 +163,48 @@ const resetBtn=document.getElementById('reset');
 function buildTutorialGrid(id,capture){
   const g=document.getElementById(id);
   for(let i=0;i<45;i++){const c=document.createElement('div');c.className='tcell';g.appendChild(c)}
-  const add=(cls,style,text='')=>{const e=document.createElement('div');e.className=cls;e.style.cssText=style;e.textContent=text;g.appendChild(e)};
+
+  const addPiece=(row,col,color,shape)=>{
+    const cell=g.children[row*5+col];
+    const e=document.createElement('div');
+    e.className=`tpiece ${color}${shape?' '+shape:''}`;
+    cell.appendChild(e);
+  };
+  const addArrow=(row,col,color,text)=>{
+    const cell=g.children[row*5+col];
+    const e=document.createElement('div');
+    e.className=`tarrow ${color}`;
+    e.textContent=text;
+    cell.appendChild(e);
+  };
+
   if(!capture){
-    add('tpiece diamond blue','left:50%;top:16.7%');
-    add('tarrow blue up','top:9%','↑');add('tarrow blue down','bottom:9%','↓');add('tarrow blue left','left:2%;top:31%','←');add('tarrow blue right','right:2%;top:31%','→');
-    add('tpiece diamond red','left:70%;top:50%');
-    add('tarrow red up','left:51%;top:42%','↑');add('tarrow red down','left:51%;bottom:42%','↓');add('tarrow red left','left:41%;top:47%','←');add('tarrow red right','right:21%;top:47%','→');
-    add('tpiece blue','left:30%;top:72%');['ul','ur','dl','dr'].forEach(d=>add('tarrow blue '+d,'',d==='ul'?'↖':d==='ur'?'↗':d==='dl'?'↙':'↘'));
-    add('tpiece red','left:70%;top:84%');['ul','ur','dl','dr'].forEach(d=>add('tarrow red '+d,'',d==='ul'?'↖':d==='ur'?'↗':d==='dl'?'↙':'↘'));
+    // Rombo azul: movimiento ortogonal, un casillero.
+    addPiece(1,2,'blue','diamond');
+    addArrow(0,2,'blue','↑'); addArrow(2,2,'blue','↓');
+    addArrow(1,1,'blue','←'); addArrow(1,3,'blue','→');
+
+    // Rombo rojo: movimiento ortogonal, un casillero.
+    addPiece(4,3,'red','diamond');
+    addArrow(3,3,'red','↑'); addArrow(5,3,'red','↓');
+    addArrow(4,2,'red','←'); addArrow(4,4,'red','→');
+
+    // Cuadrado azul: movimiento diagonal, un casillero.
+    addPiece(6,1,'blue','');
+    addArrow(5,0,'blue','↖'); addArrow(5,2,'blue','↗');
+    addArrow(7,0,'blue','↙'); addArrow(7,2,'blue','↘');
+
+    // Cuadrado rojo: movimiento diagonal, un casillero.
+    addPiece(7,3,'red','');
+    addArrow(6,2,'red','↖'); addArrow(6,4,'red','↗');
+    addArrow(8,2,'red','↙'); addArrow(8,4,'red','↘');
   }else{
-    add('tpiece diamond blue','left:50%;top:16.7%');
-    add('tpiece diamond black','left:70%;top:50%');
-    add('tpiece blue','left:30%;top:72%');
-    add('tpiece red','left:70%;top:84%');
-    add('tarrow gray','left:43%;top:58%;width:40%;height:18%;font-size:28px','↗');
+    // Ejemplo de captura a distancia.
+    addPiece(1,2,'blue','diamond');
+    addPiece(4,3,'black','diamond');
+    addPiece(6,1,'blue','');
+    addPiece(7,3,'red','');
+    addArrow(5,2,'gray','↗');
   }
 }
 buildTutorialGrid('tutorialGrid1',false); buildTutorialGrid('tutorialGrid2',true);
@@ -277,7 +305,7 @@ copyBtn.onclick=async()=>{
 gameCodeInput.addEventListener('keydown',e=>{if(e.key==='Enter')joinBtn.click()});
 
 const roomFromUrl=getRoomFromPath();
-let tutorialStarted=false;
+let tutorialStarted=!roomFromUrl;
 if(roomFromUrl){
   document.getElementById('tutorial').classList.remove('hidden');
   roomId=roomFromUrl;
