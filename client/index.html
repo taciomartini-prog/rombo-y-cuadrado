@@ -256,7 +256,9 @@ function connect(id, autoJoin=false){
     }
     if(msg.type==='joined'){
       myColor=msg.color;
-      if(tutorialStarted) showGame();
+      // El creador se queda en la pantalla del link.
+      // El invitado entra al tutorial y luego al juego.
+      if(roomFromUrl && tutorialStarted) showGame();
       return;
     }
     if(msg.type==='state'){
@@ -270,7 +272,9 @@ function connect(id, autoJoin=false){
       }else{
         connectionStatus.textContent='Esperando al jugador 2...';
       }
-      if(state.player1Connected && state.player2Connected && tutorialStarted) showGame();
+      if(state.player1Connected && state.player2Connected){
+        if(!roomFromUrl || tutorialStarted) showGame();
+      }
       renderAll();
       return;
     }
