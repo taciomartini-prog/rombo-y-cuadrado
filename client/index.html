@@ -106,7 +106,7 @@ const turnIndicator=document.getElementById('turnIndicator');
 const resetBtn=document.getElementById('reset');
 
 // Después de desplegar el servidor en Render, reemplazar esta URL.
-const SERVER_URL = window.GAME_SERVER_URL || 'wss://TU-SERVIDOR-RENDER.onrender.com';
+const SERVER_URL = window.GAME_SERVER_URL || 'wss://rombo-y-cuadrado.onrender.com';
 const tokenKey='romboCuadradoPlayerToken';
 let playerToken=localStorage.getItem(tokenKey);
 if(!playerToken){ playerToken=crypto.randomUUID(); localStorage.setItem(tokenKey,playerToken); }
