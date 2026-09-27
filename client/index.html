@@ -13,9 +13,9 @@
 html,body{margin:0;width:100%;height:100%;min-height:100dvh;overflow:hidden;background:#fff;color:#222;font-family:Arial,sans-serif;touch-action:none;position:fixed;inset:0}
 body{display:flex;justify-content:center;align-items:center}
 .app{width:100%;height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:calc(4px + env(safe-area-inset-top)) 6px calc(4px + env(safe-area-inset-bottom));text-align:center;overflow:hidden}
-.score{font-size:21px;font-weight:800;line-height:1.15;margin:0 0 5px;flex:none}
-.score-dots{display:flex;justify-content:center;gap:7px;margin-top:4px}
-.score-dot{width:12px;height:12px;border-radius:50%;border:1.5px solid #777;background:#fff;display:inline-block}
+.score{font-size:21px;font-weight:800;line-height:1.15;margin:0 0 5px;flex:none;width:100%;display:flex;justify-content:center}
+.score-dots{display:flex;justify-content:center;align-items:center;gap:26px;margin-top:4px}
+.score-dot-group{display:flex;gap:6px;align-items:center}.score-dot{width:13px;height:13px;border-radius:50%;border:1.5px solid #777;background:#fff;display:inline-block}
 .score-dot.blue.on{background:#1769e0;border-color:#1769e0}
 .score-dot.red.on{background:#ed3030;border-color:#ed3030}
 .score .blue-score{color:#1769e0}.score .red-score{color:#ed3030}
@@ -55,10 +55,66 @@ h1{display:none}
 .share-link{font-size:14px!important}
 .connection{font-size:19px;font-weight:800;min-height:28px}
 .error{color:#c00;font-weight:700;min-height:24px}
+
+.tutorial{position:fixed;inset:0;z-index:50;background:#fff;overflow-y:auto;overflow-x:hidden;padding:calc(10px + env(safe-area-inset-top)) 10px calc(18px + env(safe-area-inset-bottom));display:flex;flex-direction:column;align-items:center}
+.tutorial.hidden{display:none!important}
+.tutorial-title{font-size:30px;line-height:1.05;font-weight:900;color:#111a3a;margin:4px 0 12px}
+.tutorial-cards{width:100%;max-width:760px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tcard{border:1px solid #e1e5ec;border-radius:14px;background:#fff;overflow:hidden;box-shadow:0 1px 5px rgba(0,0,0,.05)}
+.tcard-head{display:flex;align-items:center;gap:8px;padding:10px 9px 9px;background:#f8faff;color:#111a3a;font-size:16px;font-weight:900;line-height:1.05;min-height:58px}
+.tnum{width:30px;height:30px;flex:none;border-radius:50%;background:#1769e0;color:#fff;display:flex;align-items:center;justify-content:center;font-size:17px}
+.tcard-body{padding:8px 8px 10px}
+.tgrid{width:100%;aspect-ratio:5/9;display:grid;grid-template-columns:repeat(5,1fr);grid-template-rows:repeat(9,1fr);border:1px solid #222;background:#fff;position:relative}
+.tcell{border-right:1px solid #777;border-bottom:1px solid #777;position:relative}
+.tcell:nth-child(5n){border-right:0}.tcell:nth-last-child(-n+5){border-bottom:0}
+.tpiece{position:absolute;width:62%;aspect-ratio:1;left:50%;top:50%;transform:translate(-50%,-50%);border:2px solid #111;z-index:2}
+.tpiece.diamond{transform:translate(-50%,-50%) rotate(45deg);border-radius:2px}
+.tpiece.blue{background:#1769e0}.tpiece.red{background:#ed3030}.tpiece.black{background:#111}
+.tarrow{position:absolute;width:38%;height:38%;z-index:3;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:900;line-height:1}
+.tarrow.blue{color:#1769e0}.tarrow.red{color:#ed3030}.tarrow.gray{color:#666}
+.tarrow.up{left:31%;top:0}.tarrow.down{left:31%;bottom:0}.tarrow.left{left:0;top:31%}.tarrow.right{right:0;top:31%}
+.tarrow.ur{right:1%;top:1%}.tarrow.ul{left:1%;top:1%}.tarrow.dr{right:1%;bottom:1%}.tarrow.dl{left:1%;bottom:1%}
+.tlegend{display:flex;align-items:center;gap:9px;margin-top:9px}
+.ticon{width:32px;height:32px;border:2px solid #111;flex:none;background:#fff}
+.ticon.diamond{transform:rotate(45deg)}
+.ttext b{display:block;color:#111a3a;font-size:15px;margin-bottom:2px}.ttext span{font-size:13px;line-height:1.15}
+.tcopy{font-size:13px;line-height:1.22;margin:8px 0 0;color:#111a3a}
+.tcopy strong{font-weight:900}
+.winbox{margin-top:9px;padding:9px;border-radius:10px;background:#eef5ff;display:flex;gap:8px;align-items:flex-start;color:#111a3a}
+.trophy{font-size:25px;line-height:1}
+.winbox b{display:block;font-size:14px;margin-bottom:2px}.winbox span{font-size:12px;line-height:1.18;display:block}
+.start-tutorial{width:min(92vw,700px);margin-top:12px;border:0;border-radius:14px;padding:13px 20px;background:#1769e0;color:#fff;font:900 21px Arial,sans-serif}
+@media(max-width:390px){.tutorial-title{font-size:27px}.tutorial-cards{gap:7px}.tcard-head{font-size:14px;padding:8px 6px;min-height:54px}.tnum{width:27px;height:27px;font-size:15px}.tcard-body{padding:6px}.ttext span,.tcopy{font-size:11.5px}.tlegend{gap:7px}.ticon{width:28px;height:28px}.winbox{padding:7px}.winbox span{font-size:11px}}
+
 .hidden{display:none!important}
 </style>
 </head>
 <body>
+
+<div id="tutorial" class="tutorial hidden">
+  <div class="tutorial-title">Cómo jugar</div>
+  <div class="tutorial-cards">
+    <section class="tcard">
+      <div class="tcard-head"><span class="tnum">1</span><span>Movimientos<br>de las piezas</span></div>
+      <div class="tcard-body">
+        <div class="tgrid" id="tutorialGrid1"></div>
+        <div class="tlegend"><span class="ticon diamond"></span><div class="ttext"><b>Rombo</b><span>Se mueve 1 casillero horizontal o vertical.</span></div></div>
+        <div class="tlegend"><span class="ticon"></span><div class="ttext"><b>Cuadrado</b><span>Se mueve 1 casillero en diagonal.</span></div></div>
+      </div>
+    </section>
+    <section class="tcard">
+      <div class="tcard-head"><span class="tnum">2</span><span>Cómo se come<br>una pieza</span></div>
+      <div class="tcard-body">
+        <div class="tgrid" id="tutorialGrid2"></div>
+        <p class="tcopy"><strong>Para comer</strong> no hay limitación de casilleros.</p>
+        <p class="tcopy">La pieza comida se retira del tablero.</p>
+        <div class="winbox"><span class="trophy">🏆</span><div><b>Gana la Ronda</b><span>Quien coma una pieza o haga contacto entre sus piezas primero en la misma cantidad de movimientos.</span></div></div>
+      </div>
+    </section>
+  </div>
+  <button id="startTutorial" class="start-tutorial">Empezar</button>
+</div>
+
 <div id="lobby" class="lobby">
   <h2>ROMBO Y CUADRADO</h2>
   <button id="createBtn">CREAR PARTIDA</button>
@@ -104,6 +160,27 @@ const turnEl=document.getElementById('turn');
 const hintEl=document.getElementById('hint');
 const turnIndicator=document.getElementById('turnIndicator');
 const resetBtn=document.getElementById('reset');
+function buildTutorialGrid(id,capture){
+  const g=document.getElementById(id);
+  for(let i=0;i<45;i++){const c=document.createElement('div');c.className='tcell';g.appendChild(c)}
+  const add=(cls,style,text='')=>{const e=document.createElement('div');e.className=cls;e.style.cssText=style;e.textContent=text;g.appendChild(e)};
+  if(!capture){
+    add('tpiece diamond blue','left:50%;top:16.7%');
+    add('tarrow blue up','top:9%','↑');add('tarrow blue down','bottom:9%','↓');add('tarrow blue left','left:2%;top:31%','←');add('tarrow blue right','right:2%;top:31%','→');
+    add('tpiece diamond red','left:70%;top:50%');
+    add('tarrow red up','left:51%;top:42%','↑');add('tarrow red down','left:51%;bottom:42%','↓');add('tarrow red left','left:41%;top:47%','←');add('tarrow red right','right:21%;top:47%','→');
+    add('tpiece blue','left:30%;top:72%');['ul','ur','dl','dr'].forEach(d=>add('tarrow blue '+d,'',d==='ul'?'↖':d==='ur'?'↗':d==='dl'?'↙':'↘'));
+    add('tpiece red','left:70%;top:84%');['ul','ur','dl','dr'].forEach(d=>add('tarrow red '+d,'',d==='ul'?'↖':d==='ur'?'↗':d==='dl'?'↙':'↘'));
+  }else{
+    add('tpiece diamond blue','left:50%;top:16.7%');
+    add('tpiece diamond black','left:70%;top:50%');
+    add('tpiece blue','left:30%;top:72%');
+    add('tpiece red','left:70%;top:84%');
+    add('tarrow gray','left:43%;top:58%;width:40%;height:18%;font-size:28px','↗');
+  }
+}
+buildTutorialGrid('tutorialGrid1',false); buildTutorialGrid('tutorialGrid2',true);
+
 
 // Después de desplegar el servidor en Render, reemplazar esta URL.
 const SERVER_URL = window.GAME_SERVER_URL || 'wss://rombo-y-cuadrado.onrender.com';
@@ -150,10 +227,8 @@ function connect(id, autoJoin=false){
       return;
     }
     if(msg.type==='joined'){
-      // El creador/jugador queda en la sala de espera.
-      // El tablero solo se muestra cuando el servidor informa que ambos jugadores están conectados.
       myColor=msg.color;
-      connectionStatus.textContent = state && state.player2Connected ? '🟢 JUGADOR 2 CONECTADO' : 'Esperando al jugador 2...';
+      if(tutorialStarted) showGame();
       return;
     }
     if(msg.type==='state'){
@@ -167,7 +242,7 @@ function connect(id, autoJoin=false){
       }else{
         connectionStatus.textContent='Esperando al jugador 2...';
       }
-      if(state.player1Connected && state.player2Connected) showGame();
+      if(state.player1Connected && state.player2Connected && tutorialStarted) showGame();
       renderAll();
       return;
     }
@@ -177,7 +252,7 @@ function connect(id, autoJoin=false){
       return;
     }
     if(msg.type==='reconnected'){
-      myColor=msg.color; showGame(); return;
+      myColor=msg.color; if(tutorialStarted) showGame(); return;
     }
   };
   ws.onclose=()=>{
@@ -202,7 +277,9 @@ copyBtn.onclick=async()=>{
 gameCodeInput.addEventListener('keydown',e=>{if(e.key==='Enter')joinBtn.click()});
 
 const roomFromUrl=getRoomFromPath();
+let tutorialStarted=false;
 if(roomFromUrl){
+  document.getElementById('tutorial').classList.remove('hidden');
   roomId=roomFromUrl;
   shareLink.value=makeRoomUrl(roomId);
   lobbyMsg.textContent='Te invitaron a una partida';
@@ -218,7 +295,7 @@ if(roomFromUrl){
 function renderScore(){
   const blueDots=Array.from({length:5},(_,i)=>`<span class="score-dot blue ${i<(state?.scores?.blue||0)?'on':''}></span>`).join('');
   const redDots=Array.from({length:5},(_,i)=>`<span class="score-dot red ${i<(state?.scores?.red||0)?'on':''}></span>`).join('');
-  scoreEl.innerHTML=`<div class="score-dots"><span>${blueDots}</span><span style="display:inline-block;width:28px"></span><span>${redDots}</span></div>`;
+  scoreEl.innerHTML=`<div class="score-dots"><span class="score-dot-group">${blueDots}</span><span class="score-dot-group">${redDots}</span></div>`;
 }
 function allPieces(){return [...(state?.pieces||[])];}
 function piecesAt(r,c){return allPieces().filter(p=>p.r===r&&p.c===c)}
@@ -259,23 +336,10 @@ function finalizePlacement(){
 }
 function place(r,c){
   if(!state || state.phase!=='placement' || state.placementIndex===undefined)return;
-  const order=getPlacementOrder();
-  const item=order[state.placementIndex];
-  if(!item || item.color!==myColor)return;
-
-  if(pendingPlacement&&pendingPlacement.r===r&&pendingPlacement.c===c){
-    rotatePlacement();
-    return;
-  }
+  const item=getPlacementOrder()[state.placementIndex]; if(!item || item.color!==myColor)return;
+  if(pendingPlacement&&pendingPlacement.r===r&&pendingPlacement.c===c){rotatePlacement();return;}
   if(pendingPlacement)return;
-
-  if(!validPlacement(r,c)){
-    renderAll();
-    return;
-  }
-
-  // La cuarta pieza sigue siendo una colocación: nunca se pasa
-  // a movimiento hasta que el servidor confirme las 4 piezas.
+  if(!validPlacement(r,c)){renderAll();return;}
   startPlacementPreview(r,c);
 }
 function canMovePiece(p,r,c){
@@ -302,12 +366,7 @@ function renderTurnIndicator(){
   if(state.phase==='placement'){who=getPlacementOrder()[state.placementIndex]?.color||state.starter}
   else if(state.phase==='start')who=state.turnColor;
   else if(state.phase==='finished'&&state.matchWinner){turnIndicator.textContent=state.matchWinner==='blue'?'GANA AZUL':'GANA ROJO';turnIndicator.className='turn-indicator '+state.matchWinner+' match-over';return}
-  if(state.phase==='placement'){
-    turnIndicator.textContent=who?'COLOCA '+(who==='blue'?'AZUL':'ROJO'):'';
-  }else{
-    turnIndicator.textContent=who?'MUEVE '+(who==='blue'?'AZUL':'ROJO'):'';
-  }
-  turnIndicator.className='turn-indicator '+(who||'');
+  turnIndicator.textContent=who?'MUEVE '+(who==='blue'?'AZUL':'ROJO'):'';turnIndicator.className='turn-indicator '+(who||'');
 }
 function renderAll(){
   if(!state)return;
@@ -339,6 +398,12 @@ function renderAll(){
   }
   if(pendingPlacement&&state.phase==='placement'){const cell=cells[pendingPlacement.r*COLS+pendingPlacement.c];if(cell){const ghost=document.createElement('div');ghost.className=`piece ${pendingPlacement.color} ${pendingPlacement.shape} placement-ghost`;ghost.style.transform=`rotate(${pendingPlacement.rotation}deg)`;cell.appendChild(ghost)}}
 }
+document.getElementById('startTutorial').onclick=()=>{
+  tutorialStarted=true;
+  document.getElementById('tutorial').classList.add('hidden');
+  if(state && state.player1Connected && state.player2Connected) showGame();
+  else showLobby();
+};
 resetBtn.onclick=()=>send({type:'reset'});
 
 // Si el usuario abre un link de invitación, se conecta automáticamente.
